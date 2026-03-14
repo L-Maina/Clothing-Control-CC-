@@ -1,29 +1,31 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight } from 'lucide-react';
 import { useSettingsStore } from '@/hooks/useRealtime';
 
 export function AnnouncementBanner() {
-  // Initialize dismissed state from sessionStorage (only runs on client)
-  const [isVisible, setIsVisible] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return true;
-    return sessionStorage.getItem('banner-dismissed') !== 'true';
-  });
-  
   const settings = useSettingsStore((state) => state.settings);
   const isLoading = useSettingsStore((state) => state.isLoading);
+  const dismissedBannerText = useSettingsStore((state) => state.dismissedBannerText);
+  const setDismissedBannerText = useSettingsStore((state) => state.setDismissedBannerText);
 
   const handleDismiss = () => {
-    setIsVisible(false);
-    sessionStorage.setItem('banner-dismissed', 'true');
+    // Store the current banner text when dismissing
+    setDismissedBannerText(settings.bannerText);
   };
 
+  // Banner is visible if:
+  // - Not loading
+  // - Banner is enabled and has text
+  // - Current banner text is different from the dismissed banner text
+  //   (this means a new banner will show even if the old one was dismissed)
+  const isDismissed = dismissedBannerText === settings.bannerText;
+  const isVisible = !isLoading && settings.bannerEnabled && !!settings.bannerText && !isDismissed;
+
   // Don't render while loading or if banner is disabled/not configured
-  if (isLoading) return null;
-  if (!settings.bannerEnabled || !settings.bannerText) return null;
+  if (isLoading || !settings.bannerEnabled || !settings.bannerText) return null;
 
   const content = (
     <div className="bg-amber-400 text-black relative overflow-hidden">
@@ -116,15 +118,13 @@ export function AnnouncementBanner() {
 export function useBannerHeight() {
   const settings = useSettingsStore((state) => state.settings);
   const isLoading = useSettingsStore((state) => state.isLoading);
-  
-  // Initialize dismissed state from sessionStorage (only runs on client)
-  const [dismissed, setDismissed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return sessionStorage.getItem('banner-dismissed') === 'true';
-  });
+  const dismissedBannerText = useSettingsStore((state) => state.dismissedBannerText);
+
+  // Banner is dismissed if the current text matches the dismissed text
+  const isDismissed = dismissedBannerText === settings.bannerText;
 
   // Banner height when visible (approx 44px for the banner content)
-  if (isLoading || !settings.bannerEnabled || !settings.bannerText || dismissed) {
+  if (isLoading || !settings.bannerEnabled || !settings.bannerText || isDismissed) {
     return 0;
   }
   return 44; // Approximate banner height in pixels

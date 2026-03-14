@@ -59,16 +59,13 @@ export function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [socialLinks, setSocialLinks] = useState<SocialHandle[]>([]);
-  // Initialize banner dismissed state from sessionStorage (lazy initialization)
-  const [bannerDismissed, setBannerDismissed] = useState<boolean>(() => {
-    if (typeof window === 'undefined') return false;
-    return sessionStorage.getItem('banner-dismissed') === 'true';
-  });
   const mounted = useMounted();
   
-  // Get banner settings from store
+  // Get banner settings and dismissed text from shared store
   const settings = useSettingsStore((state) => state.settings);
-  const bannerVisible = settings.bannerEnabled && settings.bannerText && !bannerDismissed;
+  const dismissedBannerText = useSettingsStore((state) => state.dismissedBannerText);
+  // Banner is visible if enabled, has text, and text differs from dismissed text
+  const bannerVisible = settings.bannerEnabled && settings.bannerText && settings.bannerText !== dismissedBannerText;
   
   const { openCart, getTotalItems } = useCartStore();
   const { currency, setCurrency, setRates } = useCurrencyStore();

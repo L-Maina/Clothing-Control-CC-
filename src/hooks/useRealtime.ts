@@ -59,9 +59,11 @@ interface SettingsStore {
   socials: SocialHandle[];
   isLoading: boolean;
   lastUpdated: number | null;
+  dismissedBannerText: string | null; // Store the text of dismissed banner
   setSettings: (settings: Partial<StoreSettings>) => void;
   setSocials: (socials: SocialHandle[]) => void;
   setLoading: (loading: boolean) => void;
+  setDismissedBannerText: (text: string | null) => void;
 }
 
 export const useSettingsStore = create<SettingsStore>()(
@@ -71,6 +73,7 @@ export const useSettingsStore = create<SettingsStore>()(
       socials: [],
       isLoading: true,
       lastUpdated: null,
+      dismissedBannerText: null,
       setSettings: (newSettings) =>
         set((state) => ({
           settings: { ...state.settings, ...newSettings },
@@ -82,6 +85,7 @@ export const useSettingsStore = create<SettingsStore>()(
           lastUpdated: Date.now(),
         }),
       setLoading: (loading) => set({ isLoading: loading }),
+      setDismissedBannerText: (text) => set({ dismissedBannerText: text }),
     }),
     {
       name: 'clothing-ctrl-settings',
@@ -89,6 +93,7 @@ export const useSettingsStore = create<SettingsStore>()(
         settings: state.settings,
         socials: state.socials,
         lastUpdated: state.lastUpdated,
+        // NOTE: dismissedBannerText is NOT persisted - it resets on page refresh
       }),
     }
   )
