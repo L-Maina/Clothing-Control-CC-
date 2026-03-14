@@ -1,5 +1,3 @@
-import { db } from '@/lib/db';
-
 // Event types for sync
 export type SyncEventType = 'SETTINGS_UPDATE' | 'SOCIALS_UPDATE' | 'ORDER_UPDATE';
 export type SyncActionType = 'CREATE' | 'UPDATE' | 'DELETE';
@@ -25,20 +23,11 @@ class SyncEventEmitter {
     };
   }
 
-  async emit(type: SyncEventType, action: SyncActionType, data: Record<string, unknown>): Promise<void> {
-    // Create sync event in database
-    await db.syncEvent.create({
-      data: {
-        type,
-        action,
-        data: JSON.stringify(data),
-      },
-    });
-
+  emit(type: SyncEventType, action: SyncActionType, data: Record<string, unknown>): void {
     const eventData: SyncEventData = { type, action, data };
     this.lastEventId++;
 
-    // Notify all subscribers
+    // Notify all subscribers immediately (no database dependency)
     this.listeners.forEach(callback => {
       try {
         callback(eventData);
@@ -57,10 +46,10 @@ class SyncEventEmitter {
 export const syncEmitter = new SyncEventEmitter();
 
 // Helper function to emit sync events
-export async function emitSyncEvent(
+export function emitSyncEvent(
   type: SyncEventType,
   action: SyncActionType,
   data: Record<string, unknown>
-): Promise<void> {
-  await syncEmitter.emit(type, action, data);
+): void {
+  syncEmitter.emit(type, action, data);
 }

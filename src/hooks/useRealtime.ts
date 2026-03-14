@@ -204,7 +204,6 @@ export function useRealtimeSync() {
       eventSourceRef.current = new EventSource('/api/sync/events');
 
       eventSourceRef.current.onopen = () => {
-        console.log('SSE: Connected to sync events');
         reconnectAttemptsRef.current = 0;
       };
 
@@ -215,7 +214,7 @@ export function useRealtimeSync() {
           // Handle different event types
           switch (data.type) {
             case 'CONNECTED':
-              console.log('SSE: Connection confirmed');
+              // Connection confirmed
               break;
 
             case 'KEEPALIVE':
@@ -223,7 +222,6 @@ export function useRealtimeSync() {
               break;
 
             case 'SETTINGS_UPDATE':
-              console.log('SSE: Settings updated');
               if (data.data) {
                 setSettings(data.data as Partial<StoreSettings>);
               } else {
@@ -232,46 +230,40 @@ export function useRealtimeSync() {
               break;
 
             case 'SOCIALS_UPDATE':
-              console.log('SSE: Socials updated');
               fetchSocials();
               break;
 
             case 'ORDER_UPDATE':
-              console.log('SSE: Order updated', data.data);
               // Emit custom event for order pages to handle
               if (typeof window !== 'undefined') {
                 window.dispatchEvent(new CustomEvent('orderUpdate', { detail: data.data }));
               }
               break;
-
-            default:
-              console.log('SSE: Unknown event type:', data.type);
           }
-        } catch (error) {
-          console.error('SSE: Failed to parse event:', error);
+        } catch {
+          // Failed to parse event, ignore
         }
       };
 
       eventSourceRef.current.onerror = () => {
-        console.error('SSE: Connection error');
+        // Silently close and attempt reconnect
         eventSourceRef.current?.close();
         eventSourceRef.current = null;
 
         // Attempt reconnect with exponential backoff
         if (reconnectAttemptsRef.current < maxReconnectAttempts) {
           const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
-          console.log(`SSE: Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectAttemptsRef.current++;
             connect();
           }, delay);
-        } else {
-          console.error('SSE: Max reconnect attempts reached');
         }
+        // If max reconnect attempts reached, silently stop trying
+        // The app will still work, just without real-time updates
       };
-    } catch (error) {
-      console.error('SSE: Failed to create EventSource:', error);
+    } catch {
+      // Failed to create EventSource, app will work without real-time updates
     }
   };
 
