@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ShoppingBag, Search, User, Globe, Heart, LogOut, Package, Instagram, Twitter, Facebook, Youtube, Sparkles, Crown, Award, Settings } from 'lucide-react';
 import { useCartStore, useCurrencyStore, useAuthStore, useWishlistStore, CURRENCIES, CurrencyCode } from '@/lib/store';
+import { useSettingsStore } from '@/hooks/useRealtime';
 import { cn } from '@/lib/utils';
 
 // Lazy load SearchModal - only load when needed
@@ -58,7 +59,16 @@ export function Navbar() {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [socialLinks, setSocialLinks] = useState<SocialHandle[]>([]);
+  // Initialize banner dismissed state from sessionStorage (lazy initialization)
+  const [bannerDismissed, setBannerDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('banner-dismissed') === 'true';
+  });
   const mounted = useMounted();
+  
+  // Get banner settings from store
+  const settings = useSettingsStore((state) => state.settings);
+  const bannerVisible = settings.bannerEnabled && settings.bannerText && !bannerDismissed;
   
   const { openCart, getTotalItems } = useCartStore();
   const { currency, setCurrency, setRates } = useCurrencyStore();
@@ -163,7 +173,8 @@ export function Navbar() {
     <>
       <header
         className={cn(
-          'fixed top-0 left-0 right-0 z-50 transition-all duration-300',
+          'fixed left-0 right-0 z-50 transition-all duration-300',
+          bannerVisible ? 'top-[44px]' : 'top-0',
           isScrolled 
             ? 'bg-black/90 backdrop-blur-md border-b border-white/10' 
             : 'bg-transparent'
