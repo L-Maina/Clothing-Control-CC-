@@ -1,56 +1,20 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight } from 'lucide-react';
-import { useLiveSettings } from '@/hooks/useRealtime';
-
-interface BannerSettings {
-  enabled: boolean;
-  text: string | null;
-  link: string | null;
-}
+import { useSettingsStore } from '@/hooks/useRealtime';
 
 export function AnnouncementBanner() {
-  const [banner, setBanner] = useState<BannerSettings | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isVisible, setIsVisible] = useState(true);
-
-  // Fetch banner settings on mount and periodically for "live" updates
-  useEffect(() => {
-    const fetchBanner = async () => {
-      try {
-        const response = await fetch('/api/admin/settings');
-        const data = await response.json();
-        if (data.settings) {
-          setBanner({
-            enabled: data.settings.bannerEnabled || false,
-            text: data.settings.bannerText || null,
-            link: data.settings.bannerLink || null,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch banner settings:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchBanner();
-
-    // Poll for updates every 30 seconds for "live" effect
-    const interval = setInterval(fetchBanner, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  // Check if previously dismissed this session
-  useEffect(() => {
-    const dismissed = sessionStorage.getItem('banner-dismissed');
-    if (dismissed === 'true') {
-      setIsVisible(false);
-    }
-  }, []);
+  // Initialize dismissed state from sessionStorage (only runs on client)
+  const [isVisible, setIsVisible] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
+    return sessionStorage.getItem('banner-dismissed') !== 'true';
+  });
+  
+  const settings = useSettingsStore((state) => state.settings);
+  const isLoading = useSettingsStore((state) => state.isLoading);
 
   const handleDismiss = () => {
     setIsVisible(false);
@@ -59,7 +23,7 @@ export function AnnouncementBanner() {
 
   // Don't render while loading or if banner is disabled/not configured
   if (isLoading) return null;
-  if (!banner?.enabled || !banner.text) return null;
+  if (!settings.bannerEnabled || !settings.bannerText) return null;
 
   const content = (
     <div className="bg-amber-400 text-black relative overflow-hidden">
@@ -93,11 +57,11 @@ export function AnnouncementBanner() {
             transition={{ delay: 0.1 }}
             className="text-sm sm:text-base font-bold tracking-tight text-center"
           >
-            {banner.text}
+            {settings.bannerText}
           </motion.p>
 
           {/* Link indicator */}
-          {banner.link && (
+          {settings.bannerLink && (
             <motion.div
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
@@ -135,8 +99,8 @@ export function AnnouncementBanner() {
           transition={{ duration: 0.3, ease: 'easeInOut' }}
           className="overflow-hidden"
         >
-          {banner.link ? (
-            <Link href={banner.link} className="block hover:brightness-105 transition-all">
+          {settings.bannerLink ? (
+            <Link href={settings.bannerLink} className="block hover:brightness-105 transition-all">
               {content}
             </Link>
           ) : (
@@ -150,35 +114,17 @@ export function AnnouncementBanner() {
 
 // Hook to get banner height for adjusting navbar position
 export function useBannerHeight() {
-  const [banner, setBanner] = useState<BannerSettings | null>(null);
+  const settings = useSettingsStore((state) => state.settings);
+  const isLoading = useSettingsStore((state) => state.isLoading);
+  
   // Initialize dismissed state from sessionStorage (only runs on client)
   const [dismissed, setDismissed] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return sessionStorage.getItem('banner-dismissed') === 'true';
   });
 
-  useEffect(() => {
-    const fetchBanner = async () => {
-      try {
-        const response = await fetch('/api/admin/settings');
-        const data = await response.json();
-        if (data.settings) {
-          setBanner({
-            enabled: data.settings.bannerEnabled || false,
-            text: data.settings.bannerText || null,
-            link: data.settings.bannerLink || null,
-          });
-        }
-      } catch (error) {
-        console.error('Failed to fetch banner settings:', error);
-      }
-    };
-
-    fetchBanner();
-  }, []);
-
   // Banner height when visible (approx 44px for the banner content)
-  if (!banner?.enabled || !banner.text || dismissed) {
+  if (isLoading || !settings.bannerEnabled || !settings.bannerText || dismissed) {
     return 0;
   }
   return 44; // Approximate banner height in pixels
