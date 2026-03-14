@@ -223,13 +223,13 @@ export async function GET(request: Request) {
     // Seed locations if empty
     await seedLocations();
 
-    // Query locations with search
+    // Query locations with search (SQLite doesn't support mode: 'insensitive')
     const locations = await db.kenyaLocation.findMany({
       where: search
         ? {
             OR: [
-              { name: { contains: search, mode: 'insensitive' } },
-              { county: { contains: search, mode: 'insensitive' } },
+              { name: { contains: search } },
+              { county: { contains: search } },
             ],
           }
         : {},
