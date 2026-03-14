@@ -37,6 +37,8 @@ import {
   ShoppingBag,
   Star,
   Trash2,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 
 interface Customer {
@@ -48,6 +50,7 @@ interface Customer {
   totalSpent: number;
   loyaltyTier: string;
   loyaltyPoints: number;
+  isRegistered: boolean; // Has password = registered user
   createdAt: Date;
 }
 
@@ -297,7 +300,20 @@ export default function AdminCustomers() {
                             </AvatarFallback>
                           </Avatar>
                           <div>
-                            <p className="text-white font-medium">{customer.name || 'N/A'}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-white font-medium">{customer.name || 'N/A'}</p>
+                              {customer.isRegistered ? (
+                                <Badge variant="outline" className="text-xs border-green-500/30 text-green-400 bg-green-500/10">
+                                  <UserCheck className="w-3 h-3 mr-1" />
+                                  Registered
+                                </Badge>
+                              ) : (
+                                <Badge variant="outline" className="text-xs border-amber-500/30 text-amber-400 bg-amber-500/10">
+                                  <UserX className="w-3 h-3 mr-1" />
+                                  Guest
+                                </Badge>
+                              )}
+                            </div>
                             <p className="text-white/40 text-xs">{customer.id.slice(0, 8)}</p>
                           </div>
                         </div>

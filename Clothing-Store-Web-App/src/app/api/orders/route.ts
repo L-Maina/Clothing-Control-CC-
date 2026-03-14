@@ -49,18 +49,34 @@ export async function POST(request: Request) {
     });
 
     if (!customer) {
-      // Create guest customer
+      // Create guest customer (will appear in admin customers tab)
       customer = await db.customer.create({
         data: {
           email: customerEmail.toLowerCase(),
           name: customerName || null,
           phone: customerPhone || null,
-          password: null,
+          password: null, // Guest - no password
           isVerified: false,
           isActive: true,
+          emailNotifications: true,
+          smsNotifications: true,
         },
         include: { loyalty: true },
       });
+    } else {
+      // Update customer info if provided and missing
+      if (customerName && !customer.name) {
+        await db.customer.update({
+          where: { id: customer.id },
+          data: { name: customerName },
+        });
+      }
+      if (customerPhone && !customer.phone) {
+        await db.customer.update({
+          where: { id: customer.id },
+          data: { phone: customerPhone },
+        });
+      }
     }
 
     // Ensure customer has loyalty record

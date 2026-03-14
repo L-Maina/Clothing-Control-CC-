@@ -22,6 +22,7 @@ export async function GET() {
       totalSpent: customer.orders.reduce((sum, order) => sum + order.total, 0),
       loyaltyTier: customer.loyalty?.tier || 'BRONZE',
       loyaltyPoints: customer.loyalty?.points || 0,
+      isRegistered: !!customer.password, // Has password = registered user
       createdAt: customer.createdAt,
     }));
 
