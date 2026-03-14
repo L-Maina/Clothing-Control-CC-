@@ -137,12 +137,15 @@ export function Navbar() {
 
   useEffect(() => {
     const handleScroll = () => {
-      setIsScrolled(window.scrollY > 50);
+      // When banner is visible, header should move to top-0 after scrolling past banner height (44px)
+      // Otherwise, just check if scrolled past 50px for background change
+      const scrollThreshold = bannerVisible ? 44 : 50;
+      setIsScrolled(window.scrollY > scrollThreshold);
     };
 
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [bannerVisible]);
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -171,7 +174,9 @@ export function Navbar() {
       <header
         className={cn(
           'fixed left-0 right-0 z-50 transition-all duration-300',
-          bannerVisible ? 'top-[44px]' : 'top-0',
+          // When banner is visible AND not scrolled past it, header is below banner
+          // When scrolled past banner OR no banner, header is at top
+          (bannerVisible && !isScrolled) ? 'top-[44px]' : 'top-0',
           isScrolled 
             ? 'bg-black/90 backdrop-blur-md border-b border-white/10' 
             : 'bg-transparent'
