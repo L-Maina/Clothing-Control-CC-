@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   LayoutDashboard,
   Package,
@@ -21,11 +21,11 @@ import {
   ShoppingCart,
   User,
   Star,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useAdminAuth } from '@/lib/admin-auth';
 
 const navigation = [
   { name: 'Dashboard', href: '/admin', icon: LayoutDashboard },
@@ -50,34 +51,10 @@ const navigation = [
 
 // Sample notifications - in production, these would come from the database
 const sampleNotifications = [
-  {
-    id: '1',
-    type: 'order',
-    message: 'New order #ORD-006 received',
-    time: '2 min ago',
-    read: false,
-  },
-  {
-    id: '2',
-    type: 'customer',
-    message: 'New customer registered',
-    time: '15 min ago',
-    read: false,
-  },
-  {
-    id: '3',
-    type: 'product',
-    message: 'Bape Hoodie is low on stock',
-    time: '1 hour ago',
-    read: true,
-  },
-  {
-    id: '4',
-    type: 'subscriber',
-    message: '5 new newsletter subscribers',
-    time: '3 hours ago',
-    read: true,
-  },
+  { id: '1', type: 'order', message: 'New order #ORD-006 received', time: '2 min ago', read: false },
+  { id: '2', type: 'customer', message: 'New customer registered', time: '15 min ago', read: false },
+  { id: '3', type: 'product', message: 'Bape Hoodie is low on stock', time: '1 hour ago', read: true },
+  { id: '4', type: 'subscriber', message: '5 new newsletter subscribers', time: '3 hours ago', read: true },
 ];
 
 interface AdminLayoutProps {
@@ -89,6 +66,22 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [notifications, setNotifications] = useState(sampleNotifications);
   const pathname = usePathname();
+  const router = useRouter();
+  const { isAdminAuthenticated, adminUser, logout } = useAdminAuth();
+  const hasCheckedAuth = useRef(false);
+
+  // Check authentication - only once
+  useEffect(() => {
+    if (hasCheckedAuth.current) return;
+    hasCheckedAuth.current = true;
+
+    // Skip auth check on login page
+    if (pathname === '/admin/login') return;
+
+    if (!isAdminAuthenticated) {
+      router.push('/admin/login');
+    }
+  }, [isAdminAuthenticated, pathname, router]);
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
@@ -100,6 +93,11 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
 
   const markAllAsRead = () => {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
+  };
+
+  const handleLogout = () => {
+    logout();
+    router.push('/admin/login');
   };
 
   const getNotificationIcon = (type: string) => {
@@ -116,6 +114,20 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
         return <Bell className="w-4 h-4 text-white/40" />;
     }
   };
+
+  // Show loading while checking auth (except on login page)
+  if (pathname !== '/admin/login' && !isAdminAuthenticated) {
+    return (
+      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+        <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
+      </div>
+    );
+  }
+
+  // Don't render layout on login page
+  if (pathname === '/admin/login') {
+    return <>{children}</>;
+  }
 
   return (
     <div className="min-h-screen bg-zinc-950">
@@ -174,19 +186,30 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-white/10 bg-zinc-900">
           <div className="flex items-center gap-3 mb-4">
             <Avatar className="w-10 h-10">
-              <AvatarFallback className="bg-amber-400 text-black font-bold">A</AvatarFallback>
+              <AvatarFallback className="bg-amber-400 text-black font-bold">
+                {adminUser?.name?.charAt(0) || 'A'}
+              </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-white text-sm font-medium truncate">Admin</p>
-              <p className="text-white/40 text-xs truncate">admin@clothingctrl.com</p>
+              <p className="text-white text-sm font-medium truncate">{adminUser?.name || 'Admin'}</p>
+              <p className="text-white/40 text-xs truncate">{adminUser?.email || 'admin@clothingctrl.com'}</p>
             </div>
           </div>
-          <Link href="/">
-            <Button variant="outline" className="w-full border-white/10 text-white/60 hover:text-white hover:bg-white/5">
-              <LogOut className="w-4 h-4 mr-2" />
-              Exit Admin
+          <div className="flex gap-2">
+            <Link href="/" className="flex-1">
+              <Button variant="outline" className="w-full border-white/10 text-white/60 hover:text-white hover:bg-white/5">
+                <ShoppingBag className="w-4 h-4 mr-2" />
+                View Store
+              </Button>
+            </Link>
+            <Button 
+              variant="outline" 
+              onClick={handleLogout}
+              className="border-red-500/20 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+            >
+              <LogOut className="w-4 h-4" />
             </Button>
-          </Link>
+          </div>
         </div>
       </aside>
 
@@ -281,7 +304,9 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                 <DropdownMenuTrigger asChild>
                   <button className="flex items-center gap-2 p-1.5 hover:bg-white/5 rounded-lg transition-colors">
                     <Avatar className="w-8 h-8">
-                      <AvatarFallback className="bg-amber-400 text-black font-bold text-sm">A</AvatarFallback>
+                      <AvatarFallback className="bg-amber-400 text-black font-bold text-sm">
+                        {adminUser?.name?.charAt(0) || 'A'}
+                      </AvatarFallback>
                     </Avatar>
                     <ChevronDown className="w-4 h-4 text-white/60 hidden md:block" />
                   </button>
@@ -301,12 +326,19 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                       Analytics
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-white/10" />
                   <DropdownMenuItem asChild>
-                    <Link href="/" className="text-red-400 focus:text-red-400 cursor-pointer">
-                      <LogOut className="w-4 h-4 mr-2" />
-                      Exit Admin
+                    <Link href="/" className="text-white/60 hover:text-white focus:text-white cursor-pointer">
+                      <ShoppingBag className="w-4 h-4 mr-2" />
+                      View Store
                     </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem 
+                    onClick={handleLogout}
+                    className="text-red-400 focus:text-red-400 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4 mr-2" />
+                    Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
