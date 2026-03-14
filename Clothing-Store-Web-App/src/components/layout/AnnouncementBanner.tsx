@@ -1,0 +1,138 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { motion, AnimatePresence } from 'framer-motion';
+import { X, ChevronRight } from 'lucide-react';
+import { useLiveSettings } from '@/hooks/useRealtime';
+
+export function AnnouncementBanner() {
+  const { getBanner, isLoading } = useLiveSettings();
+  const banner = getBanner();
+  const [isVisible, setIsVisible] = useState(true);
+  const [prevEnabled, setPrevEnabled] = useState(false);
+
+  // Track when banner becomes enabled to animate in
+  useEffect(() => {
+    if (banner?.enabled && !prevEnabled) {
+      setIsVisible(true);
+    }
+    setPrevEnabled(banner?.enabled ?? false);
+  }, [banner?.enabled, prevEnabled]);
+
+  // Don't render while loading or if banner is disabled/not configured
+  if (isLoading) return null;
+  if (!banner?.enabled || !banner.text) return null;
+
+  const handleDismiss = () => {
+    setIsVisible(false);
+    // Remember dismissal for the session
+    sessionStorage.setItem('banner-dismissed', 'true');
+  };
+
+  // Check if previously dismissed this session
+  useEffect(() => {
+    const dismissed = sessionStorage.getItem('banner-dismissed');
+    if (dismissed === 'true') {
+      setIsVisible(false);
+    }
+  }, []);
+
+  const content = (
+    <div className="bg-amber-400 text-black relative overflow-hidden">
+      {/* Animated background pattern */}
+      <div className="absolute inset-0 opacity-10">
+        <div className="absolute inset-0 bg-[linear-gradient(45deg,transparent_25%,rgba(0,0,0,0.1)_25%,rgba(0,0,0,0.1)_50%,transparent_50%,transparent_75%,rgba(0,0,0,0.1)_75%)] bg-[length:20px_20px] animate-[stripe-move_1s_linear_infinite]" />
+      </div>
+
+      <div className="container mx-auto px-4 py-2.5 relative">
+        <div className="flex items-center justify-center gap-2">
+          {/* Animated icon */}
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: 'spring', stiffness: 500, damping: 25 }}
+            className="text-lg"
+          >
+            🔥
+          </motion.span>
+
+          {/* Banner text */}
+          <motion.p
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-sm sm:text-base font-bold tracking-tight text-center"
+          >
+            {banner.text}
+          </motion.p>
+
+          {/* Link indicator */}
+          {banner.link && (
+            <motion.div
+              initial={{ opacity: 0, x: -10 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+              className="hidden sm:flex items-center gap-1 ml-2"
+            >
+              <ChevronRight className="w-4 h-4" />
+              <span className="text-xs font-semibold underline underline-offset-2">
+                Shop Now
+              </span>
+            </motion.div>
+          )}
+
+          {/* Dismiss button */}
+          <button
+            onClick={handleDismiss}
+            className="absolute right-2 sm:right-4 p-1 hover:bg-black/10 rounded-full transition-colors"
+            aria-label="Dismiss banner"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+
+  return (
+    <AnimatePresence mode="wait">
+      {isVisible && (
+        <motion.div
+          key="announcement-banner"
+          initial={{ height: 0, opacity: 0 }}
+          animate={{ height: 'auto', opacity: 1 }}
+          exit={{ height: 0, opacity: 0 }}
+          transition={{ duration: 0.3, ease: 'easeInOut' }}
+          className="overflow-hidden"
+        >
+          {banner.link ? (
+            <Link href={banner.link} className="block hover:brightness-105 transition-all">
+              {content}
+            </Link>
+          ) : (
+            content
+          )}
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+}
+
+// Hook to get banner height for adjusting navbar position
+export function useBannerHeight() {
+  const { getBanner, isLoading } = useLiveSettings();
+  const banner = getBanner();
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    const wasDismissed = sessionStorage.getItem('banner-dismissed') === 'true';
+    setDismissed(wasDismissed);
+  }, []);
+
+  // Banner height when visible (approx 44px for the banner content)
+  if (isLoading || !banner?.enabled || !banner.text || dismissed) {
+    return 0;
+  }
+  return 44; // Approximate banner height in pixels
+}
