@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { Package, Truck, CheckCircle, Clock, ExternalLink, Download, Star } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Package, Truck, CheckCircle, Clock, ExternalLink, Download, Star, ArrowLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +53,7 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.E
 };
 
 export default function OrdersPage() {
+  const router = useRouter();
   const [orders, setOrders] = useState<Order[]>([]);
   const [customer, setCustomer] = useState<CustomerData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -150,7 +152,15 @@ export default function OrdersPage() {
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-2">My Orders</h1>
+          <div className="flex items-center gap-4 mb-2">
+            <button
+              onClick={() => router.push('/account')}
+              className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+            >
+              <ArrowLeft className="w-5 h-5" />
+            </button>
+            <h1 className="text-3xl font-bold">My Orders</h1>
+          </div>
           <p className="text-gray-600">
             Track your orders and view your purchase history
           </p>

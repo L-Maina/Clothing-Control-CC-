@@ -16,7 +16,8 @@ import {
   ChevronRight,
   Crown,
   Award,
-  Sparkles
+  Sparkles,
+  ArrowLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore } from '@/lib/store';
@@ -118,7 +119,13 @@ export default function AccountPage() {
     <div className="min-h-screen bg-black pt-24 pb-12">
       <div className="container mx-auto px-4 lg:px-8">
         {/* Header */}
-        <div className="mb-8">
+        <div className="mb-8 flex items-center gap-4">
+          <button
+            onClick={() => router.push('/')}
+            className="p-2 rounded-lg bg-zinc-900 border border-white/10 text-white/60 hover:text-white hover:bg-white/5 transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </button>
           <h1 className="text-3xl font-black text-white">MY ACCOUNT</h1>
         </div>
 
