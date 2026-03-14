@@ -1,19 +1,69 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowLeft, CreditCard, Truck, Shield, Check, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowLeft, CreditCard, Truck, Shield, Check, Loader2, MapPin, Gift, Download, X, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { useCartStore, useCurrencyStore } from '@/lib/store';
+import { useCartStore, useCurrencyStore, useAuthStore, useCustomerStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+
+interface Location {
+  id: string;
+  name: string;
+  county: string;
+  type: string;
+}
+
+interface OrderResult {
+  id: string;
+  orderNumber: string;
+  status: string;
+  subtotal: number;
+  shipping: number;
+  tax: number;
+  total: number;
+  currency: string;
+  items: Array<{
+    id: string;
+    productName: string;
+    quantity: number;
+    price: number;
+    color: string | null;
+    size: string | null;
+  }>;
+  shippingAddress: {
+    firstName: string;
+    lastName: string;
+    address: string;
+    city: string;
+    country: string;
+    postalCode?: string;
+    phone: string;
+  };
+  createdAt: string;
+  loyaltyPointsEarned: number;
+}
 
 export default function CheckoutPage() {
   const { items, getSubtotal, clearCart } = useCartStore();
-  const { formatPrice, currency } = useCurrencyStore();
+  const { formatPrice } = useCurrencyStore();
+  const { isLoggedIn, user, openLoginModal } = useAuthStore();
+  const { addLoyaltyPoints } = useCustomerStore();
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'mpesa' | 'card' | 'paypal'>('mpesa');
+  const [isGuestCheckout, setIsGuestCheckout] = useState(false);
+  const [showGuestPrompt, setShowGuestPrompt] = useState(false);
+  const [orderResult, setOrderResult] = useState<OrderResult | null>(null);
+  
+  // Location autocomplete state
+  const [citySearch, setCitySearch] = useState('');
+  const [citySuggestions, setCitySuggestions] = useState<Location[]>([]);
+  const [showCitySuggestions, setShowCitySuggestions] = useState(false);
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const cityInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState({
     firstName: '',
@@ -30,11 +80,58 @@ export default function CheckoutPage() {
     cardCvc: '',
   });
 
+  // Autofill form if logged in
+  useEffect(() => {
+    if (isLoggedIn && user) {
+      const nameParts = (user.name || '').split(' ');
+      setFormData(prev => ({
+        ...prev,
+        firstName: nameParts[0] || prev.firstName,
+        lastName: nameParts.slice(1).join(' ') || prev.lastName,
+        email: user.email || prev.email,
+        phone: user.phone || prev.phone,
+      }));
+    }
+  }, [isLoggedIn, user]);
+
+  // Location autocomplete search
+  useEffect(() => {
+    const searchLocations = async () => {
+      if (citySearch.length < 2) {
+        setCitySuggestions([]);
+        return;
+      }
+      
+      setIsLoadingLocations(true);
+      try {
+        const response = await fetch(`/api/locations?q=${encodeURIComponent(citySearch)}&limit=10`);
+        const data = await response.json();
+        setCitySuggestions(data.locations || []);
+        setShowCitySuggestions(true);
+      } catch (error) {
+        console.error('Failed to fetch locations:', error);
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+
+    const debounce = setTimeout(searchLocations, 300);
+    return () => clearTimeout(debounce);
+  }, [citySearch]);
+
+  const selectCity = (location: Location) => {
+    setFormData(prev => ({ ...prev, city: location.name }));
+    setCitySearch(location.name);
+    setShowCitySuggestions(false);
+  };
+
   const subtotal = getSubtotal();
   const freeShippingThreshold = 10000;
-  const shippingCost = 500;
-  const shipping = subtotal >= freeShippingThreshold ? 0 : shippingCost;
-  const total = subtotal + shipping;
+  const baseShipping = formData.city.toLowerCase() === 'nairobi' ? 500 : 800;
+  const shipping = subtotal >= freeShippingThreshold ? 0 : baseShipping;
+  const tax = subtotal * 0.16;
+  const total = subtotal + shipping + tax;
+  const loyaltyPointsEarned = Math.floor(total / 100);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -43,37 +140,208 @@ export default function CheckoutPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsProcessing(true);
-    
-    // Simulate payment processing
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    
-    setIsProcessing(false);
-    setIsComplete(true);
-    clearCart();
+
+    try {
+      const orderData = {
+        customerEmail: formData.email,
+        customerName: `${formData.firstName} ${formData.lastName}`,
+        customerPhone: formData.phone,
+        items: items.map(item => ({
+          productId: item.productId,
+          quantity: item.quantity,
+          color: item.color,
+          size: item.size,
+        })),
+        shippingAddress: {
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          address: formData.address,
+          city: formData.city,
+          country: formData.country,
+          postalCode: formData.postalCode,
+          phone: formData.phone,
+        },
+        paymentMethod,
+        isGuestOrder: !isLoggedIn,
+      };
+
+      const response = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(orderData),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create order');
+      }
+
+      // Update loyalty points in local store if logged in
+      if (isLoggedIn && data.order.loyaltyPointsEarned) {
+        addLoyaltyPoints(data.order.loyaltyPointsEarned);
+      }
+
+      setOrderResult(data.order);
+      setIsComplete(true);
+      clearCart();
+
+      // Show guest prompt if guest checkout
+      if (!isLoggedIn) {
+        setTimeout(() => setShowGuestPrompt(true), 1000);
+      }
+    } catch (error) {
+      console.error('Order error:', error);
+      alert(error instanceof Error ? error.message : 'Failed to place order. Please try again.');
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
-  if (isComplete) {
+  // Close suggestions when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cityInputRef.current && !cityInputRef.current.contains(e.target as Node)) {
+        setShowCitySuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  if (isComplete && orderResult) {
     return (
-      <div className="min-h-screen bg-black flex items-center justify-center px-4">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="text-center max-w-md"
-        >
-          <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Check className="w-10 h-10 text-white" />
-          </div>
-          <h1 className="text-3xl font-black text-white mb-4">Order Confirmed!</h1>
-          <p className="text-white/60 mb-2">Thank you for your purchase.</p>
-          <p className="text-white/40 text-sm mb-8">
-            We've sent a confirmation email to {formData.email}
-          </p>
-          <Link href="/">
-            <Button className="bg-amber-400 hover:!bg-amber-300 text-black font-bold px-8 py-4 rounded-none transition-colors">
-              CONTINUE SHOPPING
-            </Button>
-          </Link>
-        </motion.div>
+      <div className="min-h-screen bg-black pt-24 pb-12 px-4">
+        <div className="container mx-auto max-w-2xl">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="text-center"
+          >
+            <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Check className="w-10 h-10 text-white" />
+            </div>
+            <h1 className="text-3xl font-black text-white mb-4">Order Confirmed!</h1>
+            <p className="text-white/60 mb-2">Thank you for your purchase.</p>
+            <p className="text-amber-400 text-xl font-bold mb-6">Order #{orderResult.orderNumber}</p>
+            
+            {/* Order Summary Card */}
+            <div className="bg-zinc-900 border border-white/10 p-6 mb-6 text-left">
+              <h3 className="text-lg font-bold text-white mb-4">Order Summary</h3>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-white/60">Subtotal</span>
+                  <span className="text-white">{formatPrice(orderResult.subtotal)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/60">Shipping</span>
+                  <span className="text-white">{orderResult.shipping === 0 ? 'FREE' : formatPrice(orderResult.shipping)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-white/60">Tax (16% VAT)</span>
+                  <span className="text-white">{formatPrice(orderResult.tax)}</span>
+                </div>
+                <div className="flex justify-between text-lg font-bold pt-2 border-t border-white/10">
+                  <span className="text-white">Total</span>
+                  <span className="text-amber-400">{formatPrice(orderResult.total)}</span>
+                </div>
+              </div>
+              
+              {/* Items */}
+              <div className="mt-4 pt-4 border-t border-white/10">
+                <h4 className="text-white font-medium mb-2">Items</h4>
+                {orderResult.items.map((item, index) => (
+                  <div key={index} className="flex justify-between text-sm text-white/60 py-1">
+                    <span>{item.productName} x{item.quantity}</span>
+                    <span>{formatPrice(item.price * item.quantity)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Loyalty Points Earned */}
+            {orderResult.loyaltyPointsEarned > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="bg-amber-400/10 border border-amber-400/20 p-4 mb-6 flex items-center gap-3 justify-center"
+              >
+                <Sparkles className="w-5 h-5 text-amber-400" />
+                <span className="text-amber-400 font-medium">
+                  You earned {orderResult.loyaltyPointsEarned} loyalty points!
+                </span>
+              </motion.div>
+            )}
+
+            {/* Actions */}
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Link href={`/api/orders/receipt/${orderResult.id}`} target="_blank">
+                <Button variant="outline" className="w-full sm:w-auto border-white/20 text-white hover:bg-white/5">
+                  <Download className="w-4 h-4 mr-2" />
+                  Download Receipt
+                </Button>
+              </Link>
+              <Link href="/">
+                <Button className="w-full sm:w-auto bg-amber-400 hover:!bg-amber-300 text-black font-bold">
+                  CONTINUE SHOPPING
+                </Button>
+              </Link>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Guest Account Prompt Modal */}
+        <AnimatePresence>
+          {showGuestPrompt && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[80] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+              onClick={() => setShowGuestPrompt(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                onClick={(e) => e.stopPropagation()}
+                className="bg-zinc-950 border border-white/10 rounded-lg p-6 max-w-md w-full"
+              >
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-amber-400/10 rounded-full flex items-center justify-center">
+                    <Gift className="w-6 h-6 text-amber-400" />
+                  </div>
+                  <button onClick={() => setShowGuestPrompt(false)} className="text-white/60 hover:text-white">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+                <h3 className="text-xl font-bold text-white mb-2">Create an Account?</h3>
+                <p className="text-white/60 mb-6">
+                  Create an account to track your orders, earn loyalty points, and get exclusive offers!
+                </p>
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowGuestPrompt(false)}
+                    className="flex-1 border-white/20 text-white hover:bg-white/5"
+                  >
+                    No Thanks
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      setShowGuestPrompt(false);
+                      openLoginModal();
+                    }}
+                    className="flex-1 bg-amber-400 hover:bg-amber-300 text-black font-bold"
+                  >
+                    Create Account
+                  </Button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     );
   }
@@ -103,6 +371,24 @@ export default function CheckoutPage() {
             Back to shop
           </Link>
           <h1 className="text-3xl font-black text-white">CHECKOUT</h1>
+          
+          {/* Login prompt for guests */}
+          {!isLoggedIn && (
+            <div className="mt-4 bg-amber-400/10 border border-amber-400/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Gift className="w-5 h-5 text-amber-400" />
+                <span className="text-white/80 text-sm">Have an account? Sign in to earn loyalty points and track orders.</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={openLoginModal}
+                className="border-amber-400 text-amber-400 hover:bg-amber-400 hover:text-black"
+              >
+                Sign In
+              </Button>
+            </div>
+          )}
         </div>
 
         <div className="grid lg:grid-cols-3 gap-8">
@@ -168,15 +454,54 @@ export default function CheckoutPage() {
                     onChange={handleInputChange}
                     className="sm:col-span-2 bg-zinc-800 border border-white/10 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-amber-400"
                   />
-                  <input
-                    type="text"
-                    name="city"
-                    placeholder="City"
-                    required
-                    value={formData.city}
-                    onChange={handleInputChange}
-                    className="bg-zinc-800 border border-white/10 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-amber-400"
-                  />
+                  
+                  {/* City with Autocomplete */}
+                  <div className="relative" ref={cityInputRef}>
+                    <input
+                      type="text"
+                      name="city"
+                      placeholder="City / Town"
+                      required
+                      value={citySearch || formData.city}
+                      onChange={(e) => {
+                        setCitySearch(e.target.value);
+                        setFormData(prev => ({ ...prev, city: e.target.value }));
+                      }}
+                      onFocus={() => citySearch.length >= 2 && setShowCitySuggestions(true)}
+                      className="w-full bg-zinc-800 border border-white/10 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-amber-400"
+                    />
+                    {isLoadingLocations && (
+                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-white/40" />
+                    )}
+                    
+                    {/* City Suggestions Dropdown */}
+                    <AnimatePresence>
+                      {showCitySuggestions && citySuggestions.length > 0 && (
+                        <motion.div
+                          initial={{ opacity: 0, y: -10 }}
+                          animate={{ opacity: 1, y: 0 }}
+                          exit={{ opacity: 0, y: -10 }}
+                          className="absolute z-10 w-full mt-1 bg-zinc-800 border border-white/10 rounded-lg max-h-60 overflow-y-auto"
+                        >
+                          {citySuggestions.map((location) => (
+                            <button
+                              key={location.id}
+                              type="button"
+                              onClick={() => selectCity(location)}
+                              className="w-full px-4 py-3 text-left hover:bg-zinc-700 flex items-center gap-2 text-white"
+                            >
+                              <MapPin className="w-4 h-4 text-amber-400" />
+                              <div>
+                                <span className="font-medium">{location.name}</span>
+                                <span className="text-white/50 text-sm ml-2">{location.county} County</span>
+                              </div>
+                            </button>
+                          ))}
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                  
                   <select
                     name="country"
                     value={formData.country}
@@ -201,6 +526,11 @@ export default function CheckoutPage() {
                     onChange={handleInputChange}
                     className="bg-zinc-800 border border-white/10 px-4 py-3 text-white placeholder:text-white/40 focus:outline-none focus:border-amber-400"
                   />
+                </div>
+                
+                {/* Shipping Info */}
+                <div className="mt-4 p-3 bg-zinc-800/50 text-sm text-white/60">
+                  <p>🚚 Nairobi: KSh 500 | Other areas: KSh 800 | Free shipping on orders over KSh 10,000</p>
                 </div>
               </div>
 
@@ -399,11 +729,29 @@ export default function CheckoutPage() {
                   <span className="text-white/60">Shipping</span>
                   <span className="text-white">{shipping === 0 ? 'FREE' : formatPrice(shipping)}</span>
                 </div>
+                <div className="flex justify-between text-sm">
+                  <span className="text-white/60">Tax (16% VAT)</span>
+                  <span className="text-white">{formatPrice(tax)}</span>
+                </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-white/10">
                   <span className="text-white">Total</span>
                   <span className="text-amber-400">{formatPrice(total)}</span>
                 </div>
-                <p className="text-xs text-white/40 text-right">in {currency}</p>
+              </div>
+
+              {/* Loyalty Points Preview */}
+              <div className="mt-4 p-3 bg-amber-400/10 border border-amber-400/20">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-amber-400" />
+                  <span className="text-amber-400 text-sm font-medium">
+                    Earn {loyaltyPointsEarned} loyalty points
+                  </span>
+                </div>
+                {!isLoggedIn && (
+                  <p className="text-white/50 text-xs mt-1">
+                    Sign in to start earning points
+                  </p>
+                )}
               </div>
             </div>
           </div>

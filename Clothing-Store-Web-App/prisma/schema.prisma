@@ -78,11 +78,23 @@ model Customer {
   email      String      @unique
   name       String?
   phone      String?
+  password   String?     // Hashed password (optional for guest checkout)
   addresses  String?     // JSON array of addresses
   currency   String      @default("KES") // Preferred currency
+  
+  // Notification preferences
+  emailNotifications Boolean @default(true)
+  smsNotifications   Boolean @default(true)
+  
+  // Account status
+  isVerified Boolean @default(false)
+  isActive   Boolean @default(true)
+  
   orders     Order[]
   cartItems  CartItem[]
   loyalty    Loyalty?
+  reviews    CommunityReview[]
+  notifications Notification[]
   createdAt  DateTime    @default(now())
   updatedAt  DateTime    @updatedAt
 }
@@ -132,6 +144,20 @@ model Order {
   paymentMethod String?
   paymentStatus String      @default("PENDING")
   notes         String?
+  
+  // Tracking
+  trackingNumber String?
+  trackingUrl    String?
+  estimatedDelivery DateTime?
+  
+  // Guest checkout
+  isGuestOrder  Boolean @default(false)
+  guestEmail    String?
+  
+  // Review status
+  reviewRequested Boolean @default(false)
+  reviewed        Boolean @default(false)
+  
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 }
@@ -239,4 +265,65 @@ model StoreSettings {
   
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// Community reviews - linked to orders for verification
+model CommunityReview {
+  id          String   @id @default(cuid())
+  customer    Customer @relation(fields: [customerId], references: [id])
+  customerId  String
+  orderId     String   // Must be from a delivered order
+  productId   String?
+  rating      Int      // 1-5
+  comment     String
+  imageUrl    String?  // Photo with product
+  username    String
+  verified    Boolean  @default(false) // Verified purchase
+  approved    Boolean  @default(false) // Admin approved
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// Customer notifications
+model Notification {
+  id         String   @id @default(cuid())
+  customer   Customer @relation(fields: [customerId], references: [id])
+  customerId String
+  type       String   // ORDER_UPDATE, PROMO, REVIEW_REQUEST
+  title      String
+  message    String
+  data       String?  // JSON additional data
+  read       Boolean  @default(false)
+  createdAt  DateTime @default(now())
+}
+
+// Kenya locations for autocomplete
+model KenyaLocation {
+  id        String   @id @default(cuid())
+  name      String   // City/town name
+  county    String   // County name
+  type      String   // CITY, TOWN, AREA
+  createdAt DateTime @default(now())
+}
+
+// Notification logs for SMS/Email
+model NotificationLog {
+  id           String   @id @default(cuid())
+  type         String   // SMS, EMAIL
+  recipient    String   // Phone or email
+  subject      String?
+  message      String
+  status       String   // PENDING, SENT, FAILED
+  orderId      String?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+}
+
+// Realtime sync events
+model SyncEvent {
+  id        String   @id @default(cuid())
+  type      String   // SETTINGS, SOCIALS, ORDER
+  action    String   // CREATE, UPDATE, DELETE
+  data      String   // JSON data
+  createdAt DateTime @default(now())
 }

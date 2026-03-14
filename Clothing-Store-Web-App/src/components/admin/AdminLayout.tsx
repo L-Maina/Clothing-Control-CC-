@@ -20,6 +20,7 @@ import {
   TrendingUp,
   ShoppingCart,
   User,
+  Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,6 +41,7 @@ const navigation = [
   { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
   { name: 'Customers', href: '/admin/customers', icon: Users },
   { name: 'Subscribers', href: '/admin/subscribers', icon: Mail },
+  { name: 'Reviews', href: '/admin/reviews', icon: Star },
   { name: 'Community', href: '/admin/community', icon: Image },
   { name: 'Social', href: '/admin/social', icon: Share2 },
   { name: 'Analytics', href: '/admin/analytics', icon: TrendingUp },

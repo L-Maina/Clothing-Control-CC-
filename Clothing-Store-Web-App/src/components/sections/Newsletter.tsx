@@ -2,18 +2,53 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Mail, Gift, ArrowRight, Sparkles } from 'lucide-react';
+import { Mail, Gift, ArrowRight, Sparkles, Loader2, LogIn } from 'lucide-react';
+import { useAuthStore } from '@/lib/store';
+import { Button } from '@/components/ui/button';
 
 export function Newsletter() {
+  const { isLoggedIn, user, openLoginModal } = useAuthStore();
   const [email, setEmail] = useState('');
   const [submitted, setSubmitted] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email) {
+    if (!email) return;
+
+    setIsLoading(true);
+    setError('');
+
+    try {
+      const response = await fetch('/api/subscribers', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        if (data.error?.includes('already subscribed')) {
+          setSubmitted(true); // Already subscribed, show success
+        } else {
+          setError(data.error || 'Failed to subscribe');
+        }
+        return;
+      }
+
       setSubmitted(true);
+    } catch (err) {
+      console.error('Newsletter subscription error:', err);
+      setError('Failed to subscribe. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  // If not logged in, show login prompt
+  const showLoginPrompt = !isLoggedIn;
 
   return (
     <section className="py-20 lg:py-28 bg-zinc-950 relative overflow-hidden">
@@ -44,23 +79,48 @@ export function Newsletter() {
               <p className="font-medium text-lg">You&apos;re on the list!</p>
               <p className="text-sm text-green-400/60 mt-2">Check your inbox for your 15% off code.</p>
             </div>
+          ) : showLoginPrompt ? (
+            <div className="space-y-4">
+              <p className="text-white/50 text-sm mb-4">
+                Sign in to subscribe to our newsletter and get exclusive offers.
+              </p>
+              <Button
+                onClick={openLoginModal}
+                className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-8 py-4 transition-colors flex items-center gap-2 mx-auto"
+              >
+                <LogIn className="w-4 h-4" />
+                SIGN IN TO SUBSCRIBE
+              </Button>
+            </div>
           ) : (
             <form onSubmit={handleSubmit} className="w-full max-w-lg mx-auto">
+              {error && (
+                <div className="mb-4 text-red-400 text-sm">
+                  {error}
+                </div>
+              )}
               <div className="flex flex-col sm:flex-row gap-0 bg-zinc-900 border border-white/10 overflow-hidden">
                 <input
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
+                  placeholder={user?.email || "Enter your email address"}
                   className="flex-1 bg-transparent px-5 py-4 text-white placeholder:text-white/40 focus:outline-none focus:bg-zinc-800 transition-colors text-base min-w-0 border-b sm:border-b-0 sm:border-r border-white/10"
                   required
                 />
                 <button
                   type="submit"
-                  className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-6 py-4 transition-colors flex items-center justify-center gap-2 text-base whitespace-nowrap"
+                  disabled={isLoading}
+                  className="bg-amber-400 hover:bg-amber-300 text-black font-bold px-6 py-4 transition-colors flex items-center justify-center gap-2 text-base whitespace-nowrap disabled:opacity-50"
                 >
-                  SUBSCRIBE
-                  <ArrowRight className="w-4 h-4" />
+                  {isLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <>
+                      SUBSCRIBE
+                      <ArrowRight className="w-4 h-4" />
+                    </>
+                  )}
                 </button>
               </div>
             </form>

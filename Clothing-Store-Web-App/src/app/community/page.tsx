@@ -1,14 +1,37 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowLeft, Instagram, Camera, Heart, MessageCircle, Share2 } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  ArrowLeft, Instagram, Camera, Heart, MessageCircle, Share2, 
+  Star, CheckCircle, X, Upload, ChevronDown, Sparkles, User
+} from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Navbar } from '@/components/layout/Navbar';
 import { Footer } from '@/components/layout/Footer';
 import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Newsletter } from '@/components/sections/Newsletter';
+import { useAuthStore } from '@/lib/store';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
 
 interface CommunityPhoto {
   id: string;
@@ -19,24 +42,193 @@ interface CommunityPhoto {
   createdAt: string;
 }
 
+interface CommunityReview {
+  id: string;
+  rating: number;
+  comment: string;
+  imageUrl: string | null;
+  username: string;
+  verified: boolean;
+  productId: string | null;
+  customerName: string | null;
+  createdAt: string;
+}
+
+interface DeliveredOrder {
+  id: string;
+  orderNumber: string;
+  createdAt: string;
+  items: Array<{
+    productId: string;
+    productName: string;
+    productSlug: string;
+    productImage: string | null;
+    quantity: number;
+    color: string;
+    size: string;
+    price: number;
+  }>;
+}
+
 export default function CommunityPage() {
   const [photos, setPhotos] = useState<CommunityPhoto[]>([]);
+  const [reviews, setReviews] = useState<CommunityReview[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'gallery' | 'reviews'>('gallery');
+  
+  // Review modal state
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false);
+  const [deliveredOrders, setDeliveredOrders] = useState<DeliveredOrder[]>([]);
+  const [selectedOrder, setSelectedOrder] = useState<DeliveredOrder | null>(null);
+  const [rating, setRating] = useState(5);
+  const [comment, setComment] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [username, setUsername] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  
+  const { isLoggedIn, user, openLoginModal } = useAuthStore();
+  const { toast } = useToast();
 
+  // Fetch photos and reviews
   useEffect(() => {
-    const fetchPhotos = async () => {
+    const fetchData = async () => {
       try {
-        const response = await fetch('/api/community');
-        const data = await response.json();
-        setPhotos(Array.isArray(data) ? data : []);
+        setIsLoading(true);
+        
+        // Fetch photos
+        const photosRes = await fetch('/api/community');
+        const photosData = await photosRes.json();
+        setPhotos(Array.isArray(photosData) ? photosData : []);
+        
+        // Fetch reviews
+        const reviewsRes = await fetch('/api/community/reviews');
+        const reviewsData = await reviewsRes.json();
+        setReviews(reviewsData.reviews || []);
       } catch (error) {
-        console.error('Failed to fetch community photos:', error);
+        console.error('Failed to fetch community data:', error);
       } finally {
         setIsLoading(false);
       }
     };
-    fetchPhotos();
+    fetchData();
   }, []);
+
+  // Fetch delivered orders when opening review modal
+  const fetchDeliveredOrders = useCallback(async () => {
+    if (!user?.email) return;
+    
+    try {
+      const res = await fetch('/api/community/reviews/can-review', {
+        headers: { 'x-customer-email': user.email },
+      });
+      const data = await res.json();
+      
+      if (data.canReview) {
+        setDeliveredOrders(data.orders);
+      } else {
+        setDeliveredOrders([]);
+      }
+    } catch (error) {
+      console.error('Failed to fetch delivered orders:', error);
+      setDeliveredOrders([]);
+    }
+  }, [user?.email]);
+
+  const handleOpenReviewModal = () => {
+    if (!isLoggedIn) {
+      openLoginModal();
+      return;
+    }
+    
+    // Pre-fill username from user data
+    if (user?.name) {
+      setUsername(user.name);
+    }
+    
+    setIsReviewModalOpen(true);
+    fetchDeliveredOrders();
+  };
+
+  const handleSubmitReview = async () => {
+    if (!selectedOrder || !rating || !comment || !username) {
+      toast({
+        title: 'Missing fields',
+        description: 'Please fill in all required fields',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (!user?.email) {
+      toast({
+        title: 'Error',
+        description: 'You must be logged in to submit a review',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+    
+    try {
+      const res = await fetch('/api/community/reviews', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-customer-email': user.email,
+        },
+        body: JSON.stringify({
+          orderId: selectedOrder.id,
+          productId: selectedOrder.items[0]?.productId || null,
+          rating,
+          comment,
+          imageUrl: imageUrl || null,
+          username,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to submit review');
+      }
+
+      toast({
+        title: 'Review submitted!',
+        description: data.message || 'Your review will be visible after approval.',
+      });
+
+      // Reset form and close modal
+      setIsReviewModalOpen(false);
+      setSelectedOrder(null);
+      setRating(5);
+      setComment('');
+      setImageUrl('');
+      setUsername('');
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to submit review',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const renderStars = (value: number, interactive = false) => {
+    return Array.from({ length: 5 }).map((_, i) => (
+      <Star
+        key={i}
+        className={`w-5 h-5 ${
+          i < value 
+            ? 'text-amber-400 fill-amber-400' 
+            : 'text-zinc-600'
+        } ${interactive ? 'cursor-pointer hover:scale-110 transition-transform' : ''}`}
+        onClick={interactive ? () => setRating(i + 1) : undefined}
+      />
+    ));
+  };
 
   return (
     <div className="min-h-screen bg-black flex flex-col">
@@ -51,11 +243,22 @@ export default function CommunityPage() {
               <ArrowLeft className="w-4 h-4" />
               Back to home
             </Link>
-            <div className="flex items-center gap-3 mb-2">
-              <Camera className="w-8 h-8 text-amber-400" />
-              <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">COMMUNITY</h1>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <Camera className="w-8 h-8 text-amber-400" />
+                  <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">COMMUNITY</h1>
+                </div>
+                <p className="text-white/50 mt-2">Style inspiration from our amazing customers</p>
+              </div>
+              <Button
+                onClick={handleOpenReviewModal}
+                className="bg-amber-400 text-black hover:bg-amber-300 font-bold"
+              >
+                <Sparkles className="w-4 h-4 mr-2" />
+                Share Your Style
+              </Button>
             </div>
-            <p className="text-white/50 mt-2">Style inspiration from our amazing customers</p>
           </div>
 
           {/* Social Links */}
@@ -105,55 +308,165 @@ export default function CommunityPage() {
             ))}
           </div>
 
-          {/* Photo Grid */}
-          <section className="mb-16">
-            <h2 className="text-2xl font-bold text-white mb-6 flex items-center gap-2">
-              <Camera className="w-5 h-5 text-amber-400" />
-              #ClothingCtrl Style Gallery
-            </h2>
-            
-            {isLoading ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {Array.from({ length: 8 }).map((_, i) => (
-                  <div key={i} className="aspect-square bg-zinc-900 animate-pulse" />
-                ))}
-              </div>
-            ) : photos.length > 0 ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                {photos.map((photo, idx) => (
-                  <motion.div
-                    key={photo.id}
-                    initial={{ opacity: 0, scale: 0.9 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: idx * 0.05 }}
-                    className="relative aspect-square bg-zinc-900 overflow-hidden group cursor-pointer"
-                  >
-                    <img
-                      src={photo.imageUrl}
-                      alt={`Style by ${photo.username}`}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                    />
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4">
-                      <div>
-                        <p className="text-white font-medium">@{photo.username}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Heart className="w-5 h-5 text-white" />
-                        <MessageCircle className="w-5 h-5 text-white" />
-                        <Share2 className="w-5 h-5 text-white" />
-                      </div>
-                    </div>
-                  </motion.div>
-                ))}
-              </div>
+          {/* Tabs */}
+          <div className="flex gap-4 mb-8 border-b border-white/10 pb-4">
+            <button
+              onClick={() => setActiveTab('gallery')}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === 'gallery' 
+                  ? 'text-amber-400 border-b-2 border-amber-400' 
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <Camera className="w-4 h-4 inline mr-2" />
+              Style Gallery
+            </button>
+            <button
+              onClick={() => setActiveTab('reviews')}
+              className={`px-4 py-2 font-medium transition-colors ${
+                activeTab === 'reviews' 
+                  ? 'text-amber-400 border-b-2 border-amber-400' 
+                  : 'text-white/60 hover:text-white'
+              }`}
+            >
+              <MessageCircle className="w-4 h-4 inline mr-2" />
+              Reviews ({reviews.length})
+            </button>
+          </div>
+
+          {/* Content */}
+          <AnimatePresence mode="wait">
+            {activeTab === 'gallery' ? (
+              <motion.section
+                key="gallery"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="mb-16"
+              >
+                {isLoading ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {Array.from({ length: 8 }).map((_, i) => (
+                      <div key={i} className="aspect-square bg-zinc-900 animate-pulse" />
+                    ))}
+                  </div>
+                ) : photos.length > 0 ? (
+                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {photos.map((photo, idx) => (
+                      <motion.div
+                        key={photo.id}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="relative aspect-square bg-zinc-900 overflow-hidden group cursor-pointer"
+                      >
+                        <img
+                          src={photo.imageUrl}
+                          alt={`Style by ${photo.username}`}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        />
+                        <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-end justify-between p-4">
+                          <div>
+                            <p className="text-white font-medium">@{photo.username}</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Heart className="w-5 h-5 text-white" />
+                            <Share2 className="w-5 h-5 text-white" />
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-zinc-900 border border-white/10 p-12 text-center">
+                    <Camera className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                    <p className="text-white/50">No community photos yet.</p>
+                    <p className="text-white/30 text-sm mt-2">Be the first to share your style!</p>
+                  </div>
+                )}
+              </motion.section>
             ) : (
-              <div className="bg-zinc-900 border border-white/10 p-12 text-center">
-                <Camera className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                <p className="text-white/50">No community photos yet.</p>
-                <p className="text-white/30 text-sm mt-2">Be the first to share your style!</p>
-              </div>
+              <motion.section
+                key="reviews"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="mb-16"
+              >
+                {isLoading ? (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {Array.from({ length: 4 }).map((_, i) => (
+                      <div key={i} className="bg-zinc-900 border border-white/10 p-6 animate-pulse">
+                        <div className="h-4 bg-zinc-800 rounded w-1/3 mb-4" />
+                        <div className="h-4 bg-zinc-800 rounded w-full mb-2" />
+                        <div className="h-4 bg-zinc-800 rounded w-2/3" />
+                      </div>
+                    ))}
+                  </div>
+                ) : reviews.length > 0 ? (
+                  <div className="grid md:grid-cols-2 gap-6">
+                    {reviews.map((review, idx) => (
+                      <motion.div
+                        key={review.id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="bg-zinc-900 border border-white/10 p-6"
+                      >
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 bg-zinc-800 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-white/40" />
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-white font-medium">@{review.username}</p>
+                                {review.verified && (
+                                  <span className="flex items-center gap-1 text-xs text-green-400">
+                                    <CheckCircle className="w-3 h-3" />
+                                    Verified
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 mt-1">
+                                {renderStars(review.rating)}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {review.imageUrl && (
+                          <div className="mb-4 rounded-lg overflow-hidden">
+                            <img
+                              src={review.imageUrl}
+                              alt="Review photo"
+                              className="w-full h-48 object-cover"
+                            />
+                          </div>
+                        )}
+                        
+                        <p className="text-white/70">{review.comment}</p>
+                        
+                        <p className="text-white/30 text-sm mt-4">
+                          {new Date(review.createdAt).toLocaleDateString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                          })}
+                        </p>
+                      </motion.div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="bg-zinc-900 border border-white/10 p-12 text-center">
+                    <Star className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                    <p className="text-white/50">No reviews yet.</p>
+                    <p className="text-white/30 text-sm mt-2">Be the first to share your experience!</p>
+                  </div>
+                )}
+              </motion.section>
             )}
-          </section>
+          </AnimatePresence>
 
           {/* How to Get Featured */}
           <section className="mb-16">
@@ -172,8 +485,8 @@ export default function CommunityPage() {
                 },
                 {
                   step: '3',
-                  title: 'Tag Us',
-                  description: 'Post on Instagram or TikTok with #ClothingCtrl and tag @clothing.ctrl',
+                  title: 'Share Your Style',
+                  description: 'Click "Share Your Style" button above and submit your review',
                 },
               ].map((item, idx) => (
                 <div key={idx} className="bg-zinc-900 border border-white/10 p-6">
@@ -201,6 +514,141 @@ export default function CommunityPage() {
       </main>
 
       <Footer />
+
+      {/* Review Modal */}
+      <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
+        <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Share Your Style</DialogTitle>
+            <DialogDescription className="text-white/50">
+              Share your experience with your delivered order
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-6 mt-4">
+            {deliveredOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <PackageIcon className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                <p className="text-white/50">No delivered orders available for review.</p>
+                <p className="text-white/30 text-sm mt-2">
+                  Complete an order to share your style!
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Select Order */}
+                <div className="space-y-2">
+                  <Label className="text-white/60">Select Order *</Label>
+                  <Select
+                    value={selectedOrder?.id || ''}
+                    onValueChange={(value) => 
+                      setSelectedOrder(deliveredOrders.find(o => o.id === value) || null)
+                    }
+                  >
+                    <SelectTrigger className="bg-zinc-800 border-white/10 text-white">
+                      <SelectValue placeholder="Choose an order to review" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-zinc-800 border-white/10">
+                      {deliveredOrders.map((order) => (
+                        <SelectItem key={order.id} value={order.id} className="text-white">
+                          {order.orderNumber} - {order.items.length} item(s)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Show selected order items */}
+                {selectedOrder && (
+                  <div className="bg-zinc-800/50 rounded-lg p-4 space-y-2">
+                    <p className="text-white/60 text-sm">Order Items:</p>
+                    {selectedOrder.items.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-3">
+                        {item.productImage && (
+                          <img 
+                            src={item.productImage} 
+                            alt={item.productName}
+                            className="w-10 h-10 object-cover rounded"
+                          />
+                        )}
+                        <div>
+                          <p className="text-white text-sm">{item.productName}</p>
+                          <p className="text-white/40 text-xs">{item.color} • {item.size}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Username */}
+                <div className="space-y-2">
+                  <Label className="text-white/60">Display Name *</Label>
+                  <Input
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="@username"
+                    className="bg-zinc-800 border-white/10 text-white placeholder:text-white/40"
+                  />
+                </div>
+
+                {/* Rating */}
+                <div className="space-y-2">
+                  <Label className="text-white/60">Rating *</Label>
+                  <div className="flex items-center gap-1">
+                    {renderStars(rating, true)}
+                    <span className="ml-2 text-white/60">{rating}/5</span>
+                  </div>
+                </div>
+
+                {/* Photo URL */}
+                <div className="space-y-2">
+                  <Label className="text-white/60">Photo URL (optional)</Label>
+                  <Input
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="https://example.com/your-photo.jpg"
+                    className="bg-zinc-800 border-white/10 text-white placeholder:text-white/40"
+                  />
+                  <p className="text-white/30 text-xs">
+                    Upload your photo to Instagram/TikTok and paste the image URL here
+                  </p>
+                </div>
+
+                {/* Comment */}
+                <div className="space-y-2">
+                  <Label className="text-white/60">Your Review *</Label>
+                  <Textarea
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value)}
+                    placeholder="Share your experience with this order..."
+                    className="bg-zinc-800 border-white/10 text-white placeholder:text-white/40 min-h-[100px]"
+                  />
+                </div>
+
+                {/* Submit */}
+                <Button
+                  onClick={handleSubmitReview}
+                  disabled={isSubmitting || !selectedOrder || !username || !comment}
+                  className="w-full bg-amber-400 text-black hover:bg-amber-300 font-bold"
+                >
+                  {isSubmitting ? 'Submitting...' : 'Submit Review'}
+                </Button>
+              </>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
+  );
+}
+
+// Package icon component
+function PackageIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M16.5 9.4l-9-5.19M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z" />
+      <polyline points="3.27,6.96 12,12.01 20.73,6.96" />
+      <line x1="12" y1="22.08" x2="12" y2="12" />
+    </svg>
   );
 }

@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, User, Eye, EyeOff, Chrome, Loader2 } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, Chrome, Loader2, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuthStore } from '@/lib/store';
+import { useAuthStore, useCustomerStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 export function LoginModal() {
   const { isLoginModalOpen, closeLoginModal, login, signup } = useAuthStore();
+  const { setCustomer, addLoyaltyPoints } = useCustomerStore();
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -18,6 +19,7 @@ export function LoginModal() {
     name: '',
     email: '',
     password: '',
+    phone: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -26,15 +28,29 @@ export function LoginModal() {
     setIsLoading(true);
 
     try {
-      let success = false;
+      let result;
       if (mode === 'login') {
-        success = await login(formData.email, formData.password);
+        result = await login(formData.email, formData.password);
       } else {
-        success = await signup(formData.name, formData.email, formData.password);
+        result = await signup(formData.name, formData.email, formData.password, formData.phone || undefined);
       }
 
-      if (!success) {
-        setError('Something went wrong. Please try again.');
+      if (!result.success) {
+        setError(result.error || 'Something went wrong. Please try again.');
+        // If user doesn't exist and we're in login mode, suggest signup
+        if (mode === 'login' && result.error?.toLowerCase().includes('invalid')) {
+          // Could add logic here to auto-switch to signup
+        }
+      } else {
+        // Sync with customer store
+        const auth = useAuthStore.getState();
+        if (auth.user) {
+          setCustomer(auth.user.email, auth.user.name || undefined);
+          addLoyaltyPoints(auth.user.loyaltyPoints);
+        }
+        // Reset form
+        setFormData({ name: '', email: '', password: '', phone: '' });
+        setError('');
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -71,7 +87,7 @@ export function LoginModal() {
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.9, opacity: 0 }}
             onClick={(e) => e.stopPropagation()}
-            className="relative w-full max-w-md bg-zinc-950 border border-white/10 rounded-lg overflow-hidden"
+            className="relative w-full max-w-md bg-zinc-950 border border-white/10 rounded-lg overflow-hidden max-h-[90vh] overflow-y-auto"
           >
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-white/10">
@@ -134,6 +150,23 @@ export function LoginModal() {
                   />
                 </div>
               </div>
+
+              {mode === 'signup' && (
+                <div>
+                  <label className="block text-white text-sm font-medium mb-2">Phone (optional)</label>
+                  <div className="relative">
+                    <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
+                    <input
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
+                      onChange={handleInputChange}
+                      placeholder="+254 7XX XXX XXX"
+                      className="w-full bg-zinc-900 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:border-amber-400"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-white text-sm font-medium mb-2">Password</label>
@@ -227,7 +260,7 @@ export function LoginModal() {
             {mode === 'signup' && (
               <div className="bg-zinc-900/50 border-t border-white/10 p-4">
                 <p className="text-white/60 text-xs text-center">
-                  ✨ Get 15% off your first order • 🚚 Free shipping on orders over KSh 10,000
+                  ✨ Get 15% off your first order • 🚚 Free shipping on orders over KSh 10,000 • ⭐ Earn loyalty points
                 </p>
               </div>
             )}

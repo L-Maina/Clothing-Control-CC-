@@ -151,12 +151,13 @@ export function AnnouncementBanner() {
 // Hook to get banner height for adjusting navbar position
 export function useBannerHeight() {
   const [banner, setBanner] = useState<BannerSettings | null>(null);
-  const [dismissed, setDismissed] = useState(false);
+  // Initialize dismissed state from sessionStorage (only runs on client)
+  const [dismissed, setDismissed] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return sessionStorage.getItem('banner-dismissed') === 'true';
+  });
 
   useEffect(() => {
-    const wasDismissed = sessionStorage.getItem('banner-dismissed') === 'true';
-    setDismissed(wasDismissed);
-
     const fetchBanner = async () => {
       try {
         const response = await fetch('/api/admin/settings');

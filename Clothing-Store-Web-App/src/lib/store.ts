@@ -293,69 +293,154 @@ export const useWishlistStore = create<WishlistStore>()(
   )
 );
 
-// Auth Store
+// Auth Store - Extended user interface with loyalty info
+export interface AuthUser {
+  id: string;
+  email: string;
+  name: string | null;
+  phone: string | null;
+  loyaltyPoints: number;
+  loyaltyTier: string;
+}
+
 interface AuthStore {
   isLoggedIn: boolean;
-  user: {
-    id: string;
-    email: string;
-    name: string;
-    phone?: string;
-  } | null;
+  user: AuthUser | null;
   isLoginModalOpen: boolean;
-  login: (email: string, password: string) => Promise<boolean>;
-  signup: (name: string, email: string, password: string) => Promise<boolean>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  signup: (name: string, email: string, password: string, phone?: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   openLoginModal: () => void;
   closeLoginModal: () => void;
+  fetchCurrentUser: () => Promise<void>;
+  updateUser: (user: Partial<AuthUser>) => void;
 }
 
 export const useAuthStore = create<AuthStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       isLoggedIn: false,
       user: null,
       isLoginModalOpen: false,
       
       login: async (email, password) => {
-        // Simulate API call - in production, this would hit your auth API
-        // For demo, accept any email/password combination
-        if (email && password) {
+        try {
+          const response = await fetch('/api/auth/customer/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password }),
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            return { success: false, error: data.error || 'Login failed' };
+          }
+          
+          const customer = data.customer;
+          const user: AuthUser = {
+            id: customer.id,
+            email: customer.email,
+            name: customer.name,
+            phone: customer.phone,
+            loyaltyPoints: customer.loyalty?.points || 0,
+            loyaltyTier: customer.loyalty?.tier || 'BRONZE',
+          };
+          
           set({ 
             isLoggedIn: true, 
-            user: { 
-              id: `user-${Date.now()}`, 
-              email, 
-              name: email.split('@')[0] 
-            },
+            user,
             isLoginModalOpen: false 
           });
-          return true;
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Login error:', error);
+          return { success: false, error: 'An error occurred. Please try again.' };
         }
-        return false;
       },
       
-      signup: async (name, email, password) => {
-        // Simulate API call
-        if (name && email && password) {
+      signup: async (name, email, password, phone) => {
+        try {
+          const response = await fetch('/api/auth/customer/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, email, password, phone }),
+          });
+          
+          const data = await response.json();
+          
+          if (!response.ok) {
+            return { success: false, error: data.error || 'Registration failed' };
+          }
+          
+          const customer = data.customer;
+          const user: AuthUser = {
+            id: customer.id,
+            email: customer.email,
+            name: customer.name,
+            phone: customer.phone,
+            loyaltyPoints: customer.loyalty?.points || 0,
+            loyaltyTier: customer.loyalty?.tier || 'BRONZE',
+          };
+          
           set({ 
             isLoggedIn: true, 
-            user: { 
-              id: `user-${Date.now()}`, 
-              email, 
-              name 
-            },
+            user,
             isLoginModalOpen: false 
           });
-          return true;
+          
+          return { success: true };
+        } catch (error) {
+          console.error('Signup error:', error);
+          return { success: false, error: 'An error occurred. Please try again.' };
         }
-        return false;
       },
       
       logout: () => set({ isLoggedIn: false, user: null }),
       
       openLoginModal: () => set({ isLoginModalOpen: true }),
       closeLoginModal: () => set({ isLoginModalOpen: false }),
+      
+      fetchCurrentUser: async () => {
+        const { user, isLoggedIn } = get();
+        if (!isLoggedIn || !user?.email) return;
+        
+        try {
+          const response = await fetch(`/api/auth/customer/me?email=${encodeURIComponent(user.email)}`);
+          
+          if (!response.ok) {
+            if (response.status === 401 || response.status === 404) {
+              // Session invalid, log out
+              set({ isLoggedIn: false, user: null });
+            }
+            return;
+          }
+          
+          const data = await response.json();
+          const customer = data.customer;
+          
+          const updatedUser: AuthUser = {
+            id: customer.id,
+            email: customer.email,
+            name: customer.name,
+            phone: customer.phone,
+            loyaltyPoints: customer.loyalty?.points || 0,
+            loyaltyTier: customer.loyalty?.tier || 'BRONZE',
+          };
+          
+          set({ user: updatedUser });
+        } catch (error) {
+          console.error('Failed to fetch user:', error);
+        }
+      },
+      
+      updateUser: (userData) => {
+        const currentUser = get().user;
+        if (currentUser) {
+          set({ user: { ...currentUser, ...userData } });
+        }
+      },
     }),
     {
       name: 'clothing-ctrl-auth',

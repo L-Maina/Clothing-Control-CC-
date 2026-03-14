@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, ShoppingBag, Search, User, Globe, Heart, LogOut, Package, Instagram, Twitter, Facebook, Youtube } from 'lucide-react';
+import { Menu, X, ShoppingBag, Search, User, Globe, Heart, LogOut, Package, Instagram, Twitter, Facebook, Youtube, Sparkles, Crown, Award, Settings } from 'lucide-react';
 import { useCartStore, useCurrencyStore, useAuthStore, useWishlistStore, CURRENCIES, CurrencyCode } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
@@ -42,6 +42,14 @@ function useMounted() {
   
   return mounted;
 }
+
+// Tier colors
+const tierColors: Record<string, string> = {
+  BRONZE: 'text-amber-700',
+  SILVER: 'text-gray-400',
+  GOLD: 'text-yellow-500',
+  PLATINUM: 'text-purple-400',
+};
 
 export function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
@@ -272,40 +280,87 @@ export function Navbar() {
               <div className="relative">
                 <button
                   onClick={() => isLoggedIn ? setIsUserMenuOpen(!isUserMenuOpen) : auth.openLoginModal()}
-                  className="p-1.5 sm:p-2 text-white/80 hover:text-amber-400 transition-colors"
+                  className="relative p-1.5 sm:p-2 text-white/80 hover:text-amber-400 transition-colors"
                 >
                   {isLoggedIn && user ? (
                     <div className="w-4 h-4 sm:w-5 sm:h-5 bg-amber-400 rounded-full flex items-center justify-center">
                       <span className="text-black text-[8px] sm:text-xs font-bold">
-                        {user.name.charAt(0).toUpperCase()}
+                        {user.name?.charAt(0).toUpperCase() || user.email[0].toUpperCase()}
                       </span>
                     </div>
                   ) : (
                     <User className="w-4 h-4 sm:w-5 sm:h-5" />
                   )}
+                  
+                  {/* Loyalty Points Badge */}
+                  {isLoggedIn && user && user.loyaltyPoints > 0 && (
+                    <span className="absolute -top-1 -right-1 bg-purple-500 text-white text-[8px] font-bold px-1 rounded-full flex items-center gap-0.5">
+                      <Sparkles className="w-2.5 h-2.5" />
+                      {user.loyaltyPoints > 999 ? `${Math.floor(user.loyaltyPoints / 1000)}k` : user.loyaltyPoints}
+                    </span>
+                  )}
                 </button>
 
                 {/* User Dropdown Menu */}
                 <AnimatePresence>
-                  {isUserMenuOpen && isLoggedIn && (
+                  {isUserMenuOpen && isLoggedIn && user && (
                     <motion.div
                       initial={{ opacity: 0, y: 10 }}
                       animate={{ opacity: 1, y: 0 }}
                       exit={{ opacity: 0, y: 10 }}
-                      className="absolute top-full right-0 mt-2 w-56 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden"
+                      className="absolute top-full right-0 mt-2 w-64 bg-zinc-900 border border-white/10 rounded-lg shadow-xl overflow-hidden"
                     >
-                      <div className="p-3 border-b border-white/10">
-                        <p className="text-white font-medium text-sm">{user?.name}</p>
-                        <p className="text-white/50 text-xs">{user?.email}</p>
+                      <div className="p-4 border-b border-white/10">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center">
+                            <span className="text-black font-bold">
+                              {user.name?.charAt(0).toUpperCase() || user.email[0].toUpperCase()}
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white font-medium truncate">{user.name || 'Customer'}</p>
+                            <p className="text-white/50 text-xs truncate">{user.email}</p>
+                          </div>
+                        </div>
+                        
+                        {/* Loyalty Points Display */}
+                        {user.loyaltyPoints > 0 && (
+                          <div className="mt-3 flex items-center justify-between bg-purple-500/10 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-2">
+                              <Award className={cn("w-4 h-4", tierColors[user.loyaltyTier] || 'text-purple-400')} />
+                              <span className="text-white/70 text-xs">{user.loyaltyTier} Member</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Sparkles className="w-3 h-3 text-purple-400" />
+                              <span className="text-purple-400 font-bold text-sm">{user.loyaltyPoints}</span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="p-2">
                         <Link
-                          href="/orders"
+                          href="/account"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2 text-white/70 hover:text-white hover:bg-white/5 rounded-lg text-sm transition-colors"
+                        >
+                          <User className="w-4 h-4" />
+                          My Account
+                        </Link>
+                        <Link
+                          href="/account/orders"
                           onClick={() => setIsUserMenuOpen(false)}
                           className="flex items-center gap-2 px-3 py-2 text-white/70 hover:text-white hover:bg-white/5 rounded-lg text-sm transition-colors"
                         >
                           <Package className="w-4 h-4" />
                           My Orders
+                        </Link>
+                        <Link
+                          href="/account#settings"
+                          onClick={() => setIsUserMenuOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2 text-white/70 hover:text-white hover:bg-white/5 rounded-lg text-sm transition-colors"
+                        >
+                          <Settings className="w-4 h-4" />
+                          Settings
                         </Link>
                         <button
                           onClick={() => {
@@ -402,16 +457,39 @@ export function Navbar() {
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-amber-400 rounded-full flex items-center justify-center">
                           <span className="text-black font-bold">
-                            {user?.name.charAt(0).toUpperCase()}
+                            {user?.name?.charAt(0).toUpperCase() || user?.email[0].toUpperCase()}
                           </span>
                         </div>
                         <div>
-                          <p className="text-white font-medium">{user?.name}</p>
+                          <p className="text-white font-medium">{user?.name || 'Customer'}</p>
                           <p className="text-white/50 text-sm">{user?.email}</p>
                         </div>
                       </div>
+                      
+                      {/* Mobile Loyalty Points */}
+                      {user && user.loyaltyPoints > 0 && (
+                        <div className="flex items-center justify-between bg-purple-500/10 rounded-lg px-4 py-2">
+                          <div className="flex items-center gap-2">
+                            <Award className={cn("w-4 h-4", tierColors[user.loyaltyTier] || 'text-purple-400')} />
+                            <span className="text-white/70 text-sm">{user.loyaltyTier} Member</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Sparkles className="w-3 h-3 text-purple-400" />
+                            <span className="text-purple-400 font-bold">{user.loyaltyPoints} pts</span>
+                          </div>
+                        </div>
+                      )}
+                      
                       <Link
-                        href="/orders"
+                        href="/account"
+                        onClick={() => setIsMobileMenuOpen(false)}
+                        className="flex items-center gap-2 text-white/70 hover:text-amber-400 transition-colors"
+                      >
+                        <User className="w-4 h-4" />
+                        My Account
+                      </Link>
+                      <Link
+                        href="/account/orders"
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="flex items-center gap-2 text-white/70 hover:text-amber-400 transition-colors"
                       >

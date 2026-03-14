@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { AdminLayout } from '@/components/admin/AdminLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -47,8 +47,14 @@ import {
   Truck,
   XCircle,
   Package,
+  Bell,
+  RefreshCw,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { useRealtimeSync, SyncEvent } from '@/hooks/useRealtime';
 
 interface Order {
   id: string;
@@ -73,87 +79,174 @@ export default function AdminOrders() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const { toast } = useToast();
 
+  const fetchOrders = useCallback(async (showRefreshLoader = false) => {
+    try {
+      if (showRefreshLoader) setIsRefreshing(true);
+      
+      const response = await fetch('/api/admin/orders');
+      const data = await response.json();
+      setOrders(data.orders || []);
+    } catch (error) {
+      console.error('Failed to fetch orders:', error);
+      // Demo data fallback
+      setOrders([
+        {
+          id: '1',
+          orderNumber: 'ORD-001',
+          customerName: 'John Doe',
+          customerEmail: 'john@example.com',
+          total: 15000,
+          status: 'PENDING',
+          paymentMethod: 'MPESA',
+          paymentStatus: 'PAID',
+          createdAt: new Date(),
+          items: [{ productName: 'Vintage Gucci Jacket', quantity: 1, price: 15000 }],
+        },
+        {
+          id: '2',
+          orderNumber: 'ORD-002',
+          customerName: 'Jane Smith',
+          customerEmail: 'jane@example.com',
+          total: 28000,
+          status: 'PROCESSING',
+          paymentMethod: 'CARD',
+          paymentStatus: 'PAID',
+          createdAt: new Date(Date.now() - 86400000),
+          items: [{ productName: 'Balenciaga Sneakers', quantity: 1, price: 28000 }],
+        },
+        {
+          id: '3',
+          orderNumber: 'ORD-003',
+          customerName: 'Mike Johnson',
+          customerEmail: 'mike@example.com',
+          total: 8500,
+          status: 'SHIPPED',
+          paymentMethod: 'MPESA',
+          paymentStatus: 'PAID',
+          createdAt: new Date(Date.now() - 172800000),
+          items: [{ productName: 'Bape Hoodie', quantity: 1, price: 8500 }],
+        },
+        {
+          id: '4',
+          orderNumber: 'ORD-004',
+          customerName: 'Sarah Wilson',
+          customerEmail: 'sarah@example.com',
+          total: 42000,
+          status: 'DELIVERED',
+          paymentMethod: 'PAYPAL',
+          paymentStatus: 'PAID',
+          createdAt: new Date(Date.now() - 259200000),
+          items: [
+            { productName: 'Chrome Hearts Chain', quantity: 1, price: 35000 },
+            { productName: 'Diesel Cap', quantity: 1, price: 7000 },
+          ],
+        },
+        {
+          id: '5',
+          orderNumber: 'ORD-005',
+          customerName: 'David Brown',
+          customerEmail: 'david@example.com',
+          total: 12000,
+          status: 'CANCELLED',
+          paymentMethod: 'MPESA',
+          paymentStatus: 'REFUNDED',
+          createdAt: new Date(Date.now() - 345600000),
+          items: [{ productName: 'Vintage T-Shirt', quantity: 2, price: 6000 }],
+        },
+      ]);
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
+
+  // Initial fetch
   useEffect(() => {
-    const fetchOrders = async () => {
+    fetchOrders();
+  }, [fetchOrders]);
+
+  // SSE connection for real-time updates
+  useEffect(() => {
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let reconnectAttempts = 0;
+    const maxReconnectAttempts = 5;
+    const baseReconnectDelay = 1000;
+
+    const connect = () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+
       try {
-        const response = await fetch('/api/admin/orders');
-        const data = await response.json();
-        setOrders(data.orders || []);
+        eventSource = new EventSource('/api/sync/events');
+
+        eventSource.onopen = () => {
+          console.log('Admin Orders: SSE Connected');
+          setIsConnected(true);
+          reconnectAttempts = 0;
+        };
+
+        eventSource.onmessage = (event) => {
+          try {
+            const data: SyncEvent = JSON.parse(event.data);
+
+            if (data.type === 'ORDER_UPDATE') {
+              console.log('Admin Orders: Order update received', data.data);
+              
+              // Show notification
+              toast({
+                title: 'Order Update',
+                description: `Order ${(data.data as { orderNumber?: string }).orderNumber || 'Unknown'} status: ${(data.data as { status?: string }).status || 'Updated'}`,
+                action: <Bell className="w-4 h-4" />,
+              });
+
+              // Refresh orders list
+              fetchOrders();
+            }
+          } catch (error) {
+            console.error('Failed to parse SSE event:', error);
+          }
+        };
+
+        eventSource.onerror = () => {
+          console.error('Admin Orders: SSE Connection error');
+          setIsConnected(false);
+          eventSource?.close();
+          eventSource = null;
+
+          // Attempt reconnect with exponential backoff
+          if (reconnectAttempts < maxReconnectAttempts) {
+            const delay = baseReconnectDelay * Math.pow(2, reconnectAttempts);
+            console.log(`Admin Orders: Reconnecting in ${delay}ms`);
+            
+            reconnectTimeout = setTimeout(() => {
+              reconnectAttempts++;
+              connect();
+            }, delay);
+          }
+        };
       } catch (error) {
-        console.error('Failed to fetch orders:', error);
-        // Demo data
-        setOrders([
-          {
-            id: '1',
-            orderNumber: 'ORD-001',
-            customerName: 'John Doe',
-            customerEmail: 'john@example.com',
-            total: 15000,
-            status: 'PENDING',
-            paymentMethod: 'MPESA',
-            paymentStatus: 'PAID',
-            createdAt: new Date(),
-            items: [{ productName: 'Vintage Gucci Jacket', quantity: 1, price: 15000 }],
-          },
-          {
-            id: '2',
-            orderNumber: 'ORD-002',
-            customerName: 'Jane Smith',
-            customerEmail: 'jane@example.com',
-            total: 28000,
-            status: 'PROCESSING',
-            paymentMethod: 'CARD',
-            paymentStatus: 'PAID',
-            createdAt: new Date(Date.now() - 86400000),
-            items: [{ productName: 'Balenciaga Sneakers', quantity: 1, price: 28000 }],
-          },
-          {
-            id: '3',
-            orderNumber: 'ORD-003',
-            customerName: 'Mike Johnson',
-            customerEmail: 'mike@example.com',
-            total: 8500,
-            status: 'SHIPPED',
-            paymentMethod: 'MPESA',
-            paymentStatus: 'PAID',
-            createdAt: new Date(Date.now() - 172800000),
-            items: [{ productName: 'Bape Hoodie', quantity: 1, price: 8500 }],
-          },
-          {
-            id: '4',
-            orderNumber: 'ORD-004',
-            customerName: 'Sarah Wilson',
-            customerEmail: 'sarah@example.com',
-            total: 42000,
-            status: 'DELIVERED',
-            paymentMethod: 'PAYPAL',
-            paymentStatus: 'PAID',
-            createdAt: new Date(Date.now() - 259200000),
-            items: [
-              { productName: 'Chrome Hearts Chain', quantity: 1, price: 35000 },
-              { productName: 'Diesel Cap', quantity: 1, price: 7000 },
-            ],
-          },
-          {
-            id: '5',
-            orderNumber: 'ORD-005',
-            customerName: 'David Brown',
-            customerEmail: 'david@example.com',
-            total: 12000,
-            status: 'CANCELLED',
-            paymentMethod: 'MPESA',
-            paymentStatus: 'REFUNDED',
-            createdAt: new Date(Date.now() - 345600000),
-            items: [{ productName: 'Vintage T-Shirt', quantity: 2, price: 6000 }],
-          },
-        ]);
-      } finally {
-        setLoading(false);
+        console.error('Failed to create EventSource:', error);
+        setIsConnected(false);
       }
     };
-    fetchOrders();
-  }, []);
+
+    connect();
+
+    return () => {
+      if (eventSource) {
+        eventSource.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
+    };
+  }, [fetchOrders, toast]);
 
   const formatPrice = (price: number) => {
     return new Intl.NumberFormat('en-KE', {
@@ -212,14 +305,24 @@ export default function AdminOrders() {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      await fetch(`/api/admin/orders/${orderId}`, {
+      await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       });
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o));
+      
+      toast({
+        title: 'Order Updated',
+        description: `Order status changed to ${newStatus}`,
+      });
     } catch (error) {
       console.error('Failed to update order:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update order status',
+        variant: 'destructive',
+      });
     }
   };
 
@@ -240,6 +343,33 @@ export default function AdminOrders() {
 
   return (
     <AdminLayout title="Orders">
+      {/* Connection Status */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          {isConnected ? (
+            <>
+              <Wifi className="w-4 h-4 text-green-400" />
+              <span className="text-green-400 text-sm">Live updates active</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="w-4 h-4 text-red-400" />
+              <span className="text-red-400 text-sm">Disconnected</span>
+            </>
+          )}
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => fetchOrders(true)}
+          disabled={isRefreshing}
+          className="text-white/60 hover:text-white"
+        >
+          <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <Card className="bg-zinc-900 border-white/10">
