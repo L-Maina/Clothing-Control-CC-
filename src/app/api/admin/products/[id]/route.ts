@@ -51,7 +51,7 @@ export async function GET(
   }
 }
 
-// UPDATE product
+// UPDATE product (PATCH)
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -102,6 +102,9 @@ export async function PATCH(
     );
   }
 }
+
+// UPDATE product (PUT) - same as PATCH
+export const PUT = PATCH;
 
 // DELETE product
 export async function DELETE(

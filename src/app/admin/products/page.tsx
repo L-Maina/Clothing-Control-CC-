@@ -38,8 +38,10 @@ import {
   Download,
   Search,
   RotateCw,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useUIStore } from '@/lib/store';
 
 interface Product {
   id: string;
@@ -110,6 +112,7 @@ function ProductImage({ images, name }: { images: string[]; name: string }) {
 
 export default function AdminProducts() {
   const router = useRouter();
+  const { openQuickView } = useUIStore();
   const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -336,16 +339,29 @@ export default function AdminProducts() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="bg-zinc-800 border-white/10">
-                              <DropdownMenuItem className="text-white/60 hover:text-white focus:text-white">
+                              <DropdownMenuItem 
+                                className="text-white/60 hover:text-white focus:text-white cursor-pointer"
+                                onClick={() => openQuickView(product.id)}
+                              >
                                 <Eye className="w-4 h-4 mr-2" />
-                                View
+                                Quick View
                               </DropdownMenuItem>
-                              <DropdownMenuItem className="text-white/60 hover:text-white focus:text-white">
+                              <DropdownMenuItem 
+                                className="text-white/60 hover:text-white focus:text-white cursor-pointer"
+                                onClick={() => router.push(`/admin/products/${product.id}/edit`)}
+                              >
                                 <Edit className="w-4 h-4 mr-2" />
                                 Edit
                               </DropdownMenuItem>
                               <DropdownMenuItem 
-                                className="text-red-400 focus:text-red-400"
+                                className="text-white/60 hover:text-white focus:text-white cursor-pointer"
+                                onClick={() => window.open(`/product/${product.id}`, '_blank')}
+                              >
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                View on Store
+                              </DropdownMenuItem>
+                              <DropdownMenuItem 
+                                className="text-red-400 focus:text-red-400 cursor-pointer"
                                 onClick={() => handleDelete(product.id)}
                               >
                                 <Trash2 className="w-4 h-4 mr-2" />

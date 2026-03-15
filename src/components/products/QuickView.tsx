@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Minus, Plus, Heart, Share2 } from 'lucide-react';
+import { X, Minus, Plus, Heart, Share2, Check, ShoppingCart, Link2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCartStore, useUIStore, useCurrencyStore, useWishlistStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -54,7 +54,7 @@ function isLightColor(color: string): boolean {
 
 export function QuickView() {
   const { isQuickViewOpen, quickViewProductId, closeQuickView } = useUIStore();
-  const { addItem } = useCartStore();
+  const { addItem, openCart } = useCartStore();
   const { formatPrice } = useCurrencyStore();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const [product, setProduct] = useState<Record<string, unknown> | null>(null);
@@ -63,6 +63,9 @@ export function QuickView() {
   const [selectedSize, setSelectedSize] = useState(0);
   const [quantity, setQuantity] = useState(1);
   const [isLoading, setIsLoading] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   // Fetch product when modal opens with a new productId
   useEffect(() => {
@@ -125,8 +128,13 @@ export function QuickView() {
 
   const isLiked = product ? isInWishlist(product.id as string) : false;
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (!product) return;
+    setIsAddingToCart(true);
+    
+    // Simulate a small delay for better UX
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
     addItem({
       productId: product.id as string,
       name: product.name as string,
@@ -136,7 +144,53 @@ export function QuickView() {
       size: sizes[selectedSize] || 'One Size',
       quantity,
     });
-    handleClose();
+    
+    setAddedToCart(true);
+    setIsAddingToCart(false);
+    
+    // Reset after 2 seconds and close
+    setTimeout(() => {
+      setAddedToCart(false);
+      openCart(); // Open cart drawer instead of closing
+      handleClose();
+    }, 800);
+  };
+
+  const handleShare = async () => {
+    if (!product) return;
+    
+    const productUrl = `${window.location.origin}/product/${product.slug || product.id}`;
+    const shareData = {
+      title: product.name as string,
+      text: `Check out ${product.name} on Clothing Ctrl!`,
+      url: productUrl,
+    };
+    
+    // Try native share (mobile)
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        // User cancelled share
+      }
+    } else {
+      // Fallback: copy to clipboard
+      try {
+        await navigator.clipboard.writeText(productUrl);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = productUrl;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      }
+    }
   };
 
   const handleToggleWishlist = () => {
@@ -346,27 +400,72 @@ export function QuickView() {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex gap-3">
+                  <div className="space-y-3">
+                    {/* Add to Cart Button */}
                     <Button
                       onClick={handleAddToCart}
-                      className="flex-1 bg-amber-400 hover:!bg-amber-300 text-black font-bold py-4 text-lg rounded-none transition-colors"
-                    >
-                      ADD TO CART — {formatPrice((product.price as number) * quantity)}
-                    </Button>
-                    <button 
-                      onClick={handleToggleWishlist}
+                      disabled={isAddingToCart || addedToCart}
                       className={cn(
-                        "w-12 h-12 flex items-center justify-center border transition-colors",
-                        isLiked 
-                          ? "bg-red-500 border-red-500 text-white" 
-                          : "border-white/30 text-white hover:border-amber-400 hover:text-amber-400"
+                        "w-full font-bold py-4 text-lg transition-all duration-300 flex items-center justify-center gap-2",
+                        addedToCart 
+                          ? "bg-green-500 text-white" 
+                          : "bg-amber-400 hover:!bg-amber-300 text-black"
                       )}
                     >
-                      <Heart className={cn("w-5 h-5", isLiked && "fill-current")} />
-                    </button>
-                    <button className="w-12 h-12 border border-white/30 text-white hover:border-amber-400 hover:text-amber-400 flex items-center justify-center transition-colors">
-                      <Share2 className="w-5 h-5" />
-                    </button>
+                      {isAddingToCart ? (
+                        <>
+                          <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                          Adding...
+                        </>
+                      ) : addedToCart ? (
+                        <>
+                          <Check className="w-5 h-5" />
+                          Added to Cart!
+                        </>
+                      ) : (
+                        <>
+                          <ShoppingCart className="w-5 h-5" />
+                          ADD TO CART — {formatPrice((product.price as number) * quantity)}
+                        </>
+                      )}
+                    </Button>
+                    
+                    {/* Secondary Actions */}
+                    <div className="flex gap-3">
+                      <button 
+                        onClick={handleToggleWishlist}
+                        className={cn(
+                          "flex-1 h-12 flex items-center justify-center gap-2 border transition-all",
+                          isLiked 
+                            ? "bg-red-500/20 border-red-500 text-red-400" 
+                            : "border-white/30 text-white/60 hover:border-amber-400 hover:text-amber-400"
+                        )}
+                      >
+                        <Heart className={cn("w-5 h-5", isLiked && "fill-current")} />
+                        <span className="text-sm font-medium">{isLiked ? 'Saved' : 'Save'}</span>
+                      </button>
+                      <button 
+                        onClick={handleShare}
+                        className={cn(
+                          "flex-1 h-12 flex items-center justify-center gap-2 border transition-all",
+                          copied 
+                            ? "bg-green-500/20 border-green-500 text-green-400" 
+                            : "border-white/30 text-white/60 hover:border-amber-400 hover:text-amber-400"
+                        )}
+                      >
+                        {copied ? (
+                          <>
+                            <Check className="w-5 h-5" />
+                            <span className="text-sm font-medium">Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-5 h-5" />
+                            <span className="text-sm font-medium">Share</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Limited Badge */}
