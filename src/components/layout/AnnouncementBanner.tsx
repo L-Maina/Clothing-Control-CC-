@@ -3,9 +3,12 @@
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, ChevronRight } from 'lucide-react';
-import { useSettingsStore } from '@/hooks/useRealtime';
+import { useSettingsStore, useRealtime } from '@/hooks/useRealtime';
 
 export function AnnouncementBanner() {
+  // Initialize real-time sync and fetch settings
+  useRealtime();
+  
   const settings = useSettingsStore((state) => state.settings);
   const isLoading = useSettingsStore((state) => state.isLoading);
   const dismissedBannerText = useSettingsStore((state) => state.dismissedBannerText);

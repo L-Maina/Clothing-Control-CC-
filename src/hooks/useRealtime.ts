@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect } from 'react';
 
 // Store Settings Interface
 export interface StoreSettings {
@@ -109,13 +109,7 @@ export interface SyncEvent {
   timestamp: string;
 }
 
-// SSE Connection State
-interface SSEState {
-  isConnected: boolean;
-  lastEventTime: string | null;
-  reconnectAttempts: number;
-  connectionError: string | null;
-}
+
 
 // Hook for components that need live settings with SSE
 export function useLiveSettings() {
@@ -180,34 +174,34 @@ export function useLiveSettings() {
   };
 }
 
+// Global initialization state (singleton pattern)
+let globalEventSource: EventSource | null = null;
+let globalReconnectTimeout: NodeJS.Timeout | null = null;
+let globalReconnectAttempts = 0;
+const maxReconnectAttempts = 5;
+const baseReconnectDelay = 1000;
+
 // SSE Hook for real-time updates
 export function useRealtimeSync() {
   const setSettings = useSettingsStore((state) => state.setSettings);
   const setSocials = useSettingsStore((state) => state.setSocials);
   const { fetchSettings, fetchSocials } = useLiveSettings();
 
-  // Use refs to persist across renders without causing re-renders
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const reconnectAttemptsRef = useRef(0);
-  const maxReconnectAttempts = 5;
-  const baseReconnectDelay = 1000;
-
-  // Connect function - not memoized since it references itself for reconnection
-  const connect = () => {
+  // Connect function - uses global state
+  const connect = useCallback(() => {
     if (typeof window === 'undefined') return;
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
+    if (globalEventSource) {
+      globalEventSource.close();
     }
 
     try {
-      eventSourceRef.current = new EventSource('/api/sync/events');
+      globalEventSource = new EventSource('/api/sync/events');
 
-      eventSourceRef.current.onopen = () => {
-        reconnectAttemptsRef.current = 0;
+      globalEventSource.onopen = () => {
+        globalReconnectAttempts = 0;
       };
 
-      eventSourceRef.current.onmessage = (event) => {
+      globalEventSource.onmessage = (event) => {
         try {
           const data: SyncEvent = JSON.parse(event.data);
 
@@ -245,41 +239,39 @@ export function useRealtimeSync() {
         }
       };
 
-      eventSourceRef.current.onerror = () => {
+      globalEventSource.onerror = () => {
         // Silently close and attempt reconnect
-        eventSourceRef.current?.close();
-        eventSourceRef.current = null;
+        globalEventSource?.close();
+        globalEventSource = null;
 
         // Attempt reconnect with exponential backoff
-        if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-          const delay = baseReconnectDelay * Math.pow(2, reconnectAttemptsRef.current);
+        if (globalReconnectAttempts < maxReconnectAttempts) {
+          const delay = baseReconnectDelay * Math.pow(2, globalReconnectAttempts);
           
-          reconnectTimeoutRef.current = setTimeout(() => {
-            reconnectAttemptsRef.current++;
+          globalReconnectTimeout = setTimeout(() => {
+            globalReconnectAttempts++;
             connect();
           }, delay);
         }
-        // If max reconnect attempts reached, silently stop trying
-        // The app will still work, just without real-time updates
       };
     } catch {
       // Failed to create EventSource, app will work without real-time updates
     }
-  };
+  }, [setSettings, fetchSettings, fetchSocials]);
 
   const disconnect = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (globalEventSource) {
+      globalEventSource.close();
+      globalEventSource = null;
     }
-    if (reconnectTimeoutRef.current) {
-      clearTimeout(reconnectTimeoutRef.current);
-      reconnectTimeoutRef.current = null;
+    if (globalReconnectTimeout) {
+      clearTimeout(globalReconnectTimeout);
+      globalReconnectTimeout = null;
     }
   }, []);
 
   const isConnected = useCallback(() => 
-    eventSourceRef.current?.readyState === EventSource.OPEN, []);
+    globalEventSource?.readyState === EventSource.OPEN, []);
 
   return {
     connect,
@@ -290,29 +282,39 @@ export function useRealtimeSync() {
 
 // Custom hook for pages that need real-time sync
 export function useRealtime() {
-  const { connect, disconnect, isConnected } = useRealtimeSync();
+  const { connect } = useRealtimeSync();
   const { fetchSettings, fetchSocials } = useLiveSettings();
-  const initializedRef = useRef(false);
 
-  // Initialize on mount (client-side only) - using useEffect to ensure single init
+  // Initialize on mount (client-side only)
   useEffect(() => {
-    if (typeof window === 'undefined' || initializedRef.current) return;
-    initializedRef.current = true;
+    if (typeof window === 'undefined') return;
     
-    // Fetch initial data
+    // Always fetch fresh settings on mount (bypass cache)
     fetchSettings();
     fetchSocials();
     
-    // Connect to SSE for real-time updates
+    // Connect to SSE for real-time updates (may not work in serverless, but harmless)
     connect();
     
-    return () => {
-      disconnect();
-      initializedRef.current = false;
+    // Re-fetch settings when window gains focus (tab switch, etc.)
+    const handleFocus = () => {
+      fetchSettings();
+      fetchSocials();
     };
-  }, []); // Empty deps - we only want this to run once on mount
+    
+    window.addEventListener('focus', handleFocus);
+    
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      // Don't disconnect SSE - keep it alive for other components
+    };
+  }, [connect, fetchSettings, fetchSocials]);
 
   return {
-    isConnected,
+    isConnected: () => globalEventSource?.readyState === EventSource.OPEN,
+    refetch: () => {
+      fetchSettings();
+      fetchSocials();
+    },
   };
 }
