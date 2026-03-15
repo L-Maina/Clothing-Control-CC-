@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthStore } from '@/lib/store';
 
 interface Order {
   id: string;
@@ -34,16 +35,6 @@ interface Order {
   reviewed: boolean;
 }
 
-interface CustomerData {
-  id: string;
-  name: string | null;
-  email: string;
-  loyalty: {
-    points: number;
-    tier: string;
-  } | null;
-}
-
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
   PENDING: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
   PROCESSING: { label: 'Processing', color: 'bg-blue-100 text-blue-800', icon: Package },
@@ -54,50 +45,27 @@ const statusConfig: Record<string, { label: string; color: string; icon: React.E
 
 export default function OrdersPage() {
   const router = useRouter();
+  const { isLoggedIn, user } = useAuthStore();
   const [orders, setOrders] = useState<Order[]>([]);
-  const [customer, setCustomer] = useState<CustomerData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [customerEmail, setCustomerEmail] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Check for customer email (from localStorage or session)
+  // Redirect if not logged in
   useEffect(() => {
-    const email = localStorage.getItem('customerEmail');
-    if (email) {
-      setCustomerEmail(email);
-    } else {
-      setLoading(false);
+    if (!isLoggedIn) {
+      router.push('/');
     }
-  }, []);
-
-  // Fetch customer data
-  useEffect(() => {
-    if (!customerEmail) return;
-
-    const fetchCustomer = async () => {
-      try {
-        const response = await fetch(`/api/auth/customer/me?email=${customerEmail}`);
-        if (response.ok) {
-          const data = await response.json();
-          setCustomer(data.customer);
-        }
-      } catch (error) {
-        console.error('Failed to fetch customer:', error);
-      }
-    };
-
-    fetchCustomer();
-  }, [customerEmail]);
+  }, [isLoggedIn, router]);
 
   // Fetch orders
   useEffect(() => {
-    if (!customerEmail) return;
+    if (!isLoggedIn || !user?.email) return;
 
     const fetchOrders = async () => {
       try {
         const response = await fetch('/api/orders', {
           headers: {
-            'x-customer-email': customerEmail,
+            'x-customer-email': user.email,
           },
         });
         if (response.ok) {
@@ -112,21 +80,20 @@ export default function OrdersPage() {
     };
 
     fetchOrders();
-  }, [customerEmail]);
+  }, [isLoggedIn, user?.email]);
 
   const handlePrintReceipt = (orderId: string) => {
     window.open(`/api/orders/receipt/${orderId}?print=1`, '_blank');
   };
 
   const handleRequestReview = async (orderId: string) => {
-    // This would open a review modal or navigate to a review page
     toast({
       title: 'Coming Soon',
       description: 'Review feature will be available soon!',
     });
   };
 
-  if (!customerEmail) {
+  if (!isLoggedIn || !user) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
         <div className="container mx-auto px-4 max-w-4xl">
@@ -167,18 +134,18 @@ export default function OrdersPage() {
         </div>
 
         {/* Loyalty Card */}
-        {customer?.loyalty && (
+        {user.loyaltyPoints > 0 && (
           <Card className="mb-8 bg-gradient-to-r from-gray-900 to-gray-700 text-white">
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm text-gray-300">Loyalty Points</p>
-                  <p className="text-3xl font-bold">{customer.loyalty.points}</p>
+                  <p className="text-3xl font-bold">{user.loyaltyPoints}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-sm text-gray-300">Member Tier</p>
                   <Badge className="bg-yellow-500 text-black text-lg px-4 py-1">
-                    {customer.loyalty.tier}
+                    {user.loyaltyTier}
                   </Badge>
                 </div>
               </div>
@@ -206,7 +173,7 @@ export default function OrdersPage() {
                 You have not placed any orders yet. Start shopping!
               </p>
               <Button asChild>
-                <Link href="/shop">Browse Products</Link>
+                <Link href="/">Browse Products</Link>
               </Button>
             </CardContent>
           </Card>
