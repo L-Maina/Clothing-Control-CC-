@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import bcrypt from 'bcrypt';
-
-// Simple email validation regex
-const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+import { validateEmail } from '@/lib/email-validation-server';
 
 export async function POST(request: Request) {
   try {
@@ -18,10 +16,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate email format
-    if (!EMAIL_REGEX.test(email)) {
+    // Validate email format and verify domain exists (server-side with MX check)
+    const emailValidation = await validateEmail(email);
+    
+    if (!emailValidation.valid) {
       return NextResponse.json(
-        { error: 'Please enter a valid email address' },
+        { 
+          error: emailValidation.error,
+          suggestion: emailValidation.suggestion,
+        },
         { status: 400 }
       );
     }
@@ -34,9 +37,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const normalizedEmail = email.toLowerCase().trim();
+
     // Check if customer already exists
     const existingCustomer = await db.customer.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email: normalizedEmail },
     });
 
     if (existingCustomer) {
@@ -52,7 +57,7 @@ export async function POST(request: Request) {
     // Create customer with loyalty record
     const customer = await db.customer.create({
       data: {
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         password: hashedPassword,
         name: name || null,
         phone: phone || null,

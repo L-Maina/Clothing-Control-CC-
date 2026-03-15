@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Mail, Lock, User, Eye, EyeOff, Chrome, Loader2, Phone } from 'lucide-react';
+import { X, Mail, Lock, User, Eye, EyeOff, Chrome, Loader2, Phone, AlertCircle, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useAuthStore, useCustomerStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { validateEmailSimple } from '@/lib/email-validation';
 
 export function LoginModal() {
   const { isLoginModalOpen, closeLoginModal, login, signup } = useAuthStore();
@@ -14,6 +15,8 @@ export function LoginModal() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
+  const [emailStatus, setEmailStatus] = useState<'valid' | 'invalid' | 'checking' | null>(null);
   
   const [formData, setFormData] = useState({
     name: '',
@@ -21,6 +24,31 @@ export function LoginModal() {
     password: '',
     phone: '',
   });
+
+  // Check email validity on change
+  const handleEmailChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const email = e.target.value;
+    setFormData({ ...formData, email });
+    setEmailSuggestion(null);
+    
+    if (email && email.includes('@')) {
+      const validation = validateEmailSimple(email);
+      if (validation.suggestion) {
+        setEmailSuggestion(validation.suggestion);
+      }
+      setEmailStatus(validation.valid ? 'valid' : 'invalid');
+    } else {
+      setEmailStatus(null);
+    }
+  };
+
+  const applyEmailSuggestion = () => {
+    if (emailSuggestion) {
+      setFormData({ ...formData, email: emailSuggestion });
+      setEmailSuggestion(null);
+      setEmailStatus('valid');
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,10 +65,6 @@ export function LoginModal() {
 
       if (!result.success) {
         setError(result.error || 'Something went wrong. Please try again.');
-        // If user doesn't exist and we're in login mode, suggest signup
-        if (mode === 'login' && result.error?.toLowerCase().includes('invalid')) {
-          // Could add logic here to auto-switch to signup
-        }
       } else {
         // Sync with customer store
         const auth = useAuthStore.getState();
@@ -51,6 +75,8 @@ export function LoginModal() {
         // Reset form
         setFormData({ name: '', email: '', password: '', phone: '' });
         setError('');
+        setEmailSuggestion(null);
+        setEmailStatus(null);
       }
     } catch {
       setError('An error occurred. Please try again.');
@@ -60,12 +86,18 @@ export function LoginModal() {
   };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+    if (e.target.name === 'email') {
+      handleEmailChange(e);
+    } else {
+      setFormData({ ...formData, [e.target.name]: e.target.value });
+    }
   };
 
   const switchMode = () => {
     setMode(mode === 'login' ? 'signup' : 'login');
     setError('');
+    setEmailSuggestion(null);
+    setEmailStatus(null);
   };
 
   return (
@@ -112,8 +144,9 @@ export function LoginModal() {
             {/* Form */}
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {error && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded">
-                  {error}
+                <div className="bg-red-500/10 border border-red-500/20 text-red-400 text-sm p-3 rounded flex items-start gap-2">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  <span>{error}</span>
                 </div>
               )}
 
@@ -146,9 +179,30 @@ export function LoginModal() {
                     onChange={handleInputChange}
                     placeholder="you@example.com"
                     required
-                    className="w-full bg-zinc-900 border border-white/10 rounded-lg py-3 pl-10 pr-4 text-white placeholder:text-white/40 focus:outline-none focus:border-amber-400"
+                    className={cn(
+                      "w-full bg-zinc-900 border rounded-lg py-3 pl-10 pr-10 text-white placeholder:text-white/40 focus:outline-none",
+                      emailStatus === 'valid' ? "border-green-500/50 focus:border-green-500" :
+                      emailStatus === 'invalid' ? "border-red-500/50 focus:border-red-500" :
+                      "border-white/10 focus:border-amber-400"
+                    )}
                   />
+                  {emailStatus === 'valid' && (
+                    <CheckCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+                  )}
+                  {emailStatus === 'invalid' && (
+                    <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
+                  )}
                 </div>
+                {/* Email suggestion */}
+                {emailSuggestion && (
+                  <button
+                    type="button"
+                    onClick={applyEmailSuggestion}
+                    className="mt-2 text-sm text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                  >
+                    Did you mean <span className="underline">{emailSuggestion}</span>?
+                  </button>
+                )}
               </div>
 
               {mode === 'signup' && (

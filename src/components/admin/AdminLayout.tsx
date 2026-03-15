@@ -23,6 +23,8 @@ import {
   Star,
   Loader2,
   Clock,
+  AlertTriangle,
+  MessageSquare,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -51,13 +53,17 @@ const navigation = [
   { name: 'Settings', href: '/admin/settings', icon: Settings },
 ];
 
-// Sample notifications - in production, these would come from the database
-const sampleNotifications = [
-  { id: '1', type: 'order', message: 'New order #ORD-006 received', time: '2 min ago', read: false },
-  { id: '2', type: 'customer', message: 'New customer registered', time: '15 min ago', read: false },
-  { id: '3', type: 'product', message: 'Bape Hoodie is low on stock', time: '1 hour ago', read: true },
-  { id: '4', type: 'subscriber', message: '5 new newsletter subscribers', time: '3 hours ago', read: true },
-];
+interface Notification {
+  id: string;
+  type: 'order' | 'customer' | 'product' | 'subscriber' | 'review' | 'community';
+  message: string;
+  time: string;
+  read: boolean;
+  link: string;
+  orderId?: string;
+  productId?: string;
+  customerId?: string;
+}
 
 interface AdminLayoutProps {
   children: React.ReactNode;
@@ -66,7 +72,8 @@ interface AdminLayoutProps {
 
 export function AdminLayout({ children, title }: AdminLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [notifications, setNotifications] = useState(sampleNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoadingNotifications, setIsLoadingNotifications] = useState(true);
   const pathname = usePathname();
   const router = useRouter();
   const { isAdminAuthenticated, adminUser, logout } = useAdminAuth();
@@ -85,16 +92,56 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
     }
   }, [isAdminAuthenticated, pathname, router]);
 
+  // Fetch real notifications
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      try {
+        const response = await fetch('/api/admin/notifications');
+        if (response.ok) {
+          const data = await response.json();
+          setNotifications(data.notifications || []);
+        }
+      } catch (error) {
+        console.error('Failed to fetch notifications:', error);
+      } finally {
+        setIsLoadingNotifications(false);
+      }
+    };
+
+    if (pathname !== '/admin/login' && isAdminAuthenticated) {
+      fetchNotifications();
+    }
+  }, [pathname, isAdminAuthenticated]);
+
   const unreadCount = notifications.filter(n => !n.read).length;
 
-  const markAsRead = (id: string) => {
+  const markAsRead = async (id: string) => {
     setNotifications(notifications.map(n => 
       n.id === id ? { ...n, read: true } : n
     ));
+    
+    // Mark as read on server
+    try {
+      await fetch(`/api/admin/notifications/${id}/read`, { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to mark notification as read:', error);
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(notifications.map(n => ({ ...n, read: true })));
+    
+    // Mark all as read on server
+    try {
+      await fetch('/api/admin/notifications/read-all', { method: 'POST' });
+    } catch (error) {
+      console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  const handleNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
+    router.push(notification.link);
   };
 
   const handleLogout = () => {
@@ -112,6 +159,10 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
         return <Package className="w-4 h-4 text-purple-400" />;
       case 'subscriber':
         return <Mail className="w-4 h-4 text-green-400" />;
+      case 'review':
+        return <MessageSquare className="w-4 h-4 text-yellow-400" />;
+      case 'community':
+        return <Image className="w-4 h-4 text-pink-400" />;
       default:
         return <Bell className="w-4 h-4 text-white/40" />;
     }
@@ -257,7 +308,11 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                   </div>
                   <DropdownMenuSeparator className="bg-white/10" />
                   <div className="max-h-80 overflow-y-auto">
-                    {notifications.length === 0 ? (
+                    {isLoadingNotifications ? (
+                      <div className="p-4 flex justify-center">
+                        <Loader2 className="w-5 h-5 text-amber-400 animate-spin" />
+                      </div>
+                    ) : notifications.length === 0 ? (
                       <div className="p-4 text-center text-white/40 text-sm">
                         No notifications
                       </div>
@@ -265,7 +320,7 @@ export function AdminLayout({ children, title }: AdminLayoutProps) {
                       notifications.map((notification) => (
                         <div
                           key={notification.id}
-                          onClick={() => markAsRead(notification.id)}
+                          onClick={() => handleNotificationClick(notification)}
                           className={cn(
                             'flex items-start gap-3 p-3 cursor-pointer hover:bg-white/5 transition-colors',
                             !notification.read && 'bg-white/5'
