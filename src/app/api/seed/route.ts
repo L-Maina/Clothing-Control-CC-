@@ -3,17 +3,7 @@ import { db } from '@/lib/db';
 
 export async function POST() {
   try {
-    // Check if already seeded
-    const existingProducts = await db.product.count();
-    if (existingProducts > 0) {
-      return NextResponse.json({ 
-        success: true, 
-        message: 'Database already seeded',
-        products: existingProducts 
-      });
-    }
-
-    // Clear existing data
+    // Clear existing data (always clear and reseed)
     await db.communityPhoto.deleteMany();
     await db.orderItem.deleteMany();
     await db.order.deleteMany();
