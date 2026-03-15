@@ -180,21 +180,40 @@ export default function AdminDropsPage() {
   };
 
   const toggleActive = async (drop: Drop) => {
+    // Optimistically update UI
+    const wasActive = drop.active;
+    setDrops(drops.map(d => {
+      if (d.id === drop.id) {
+        return { ...d, active: !d.active };
+      }
+      // Deactivate other drops if this one is being activated
+      if (!wasActive) {
+        return { ...d, active: false };
+      }
+      return d;
+    }));
+
     try {
       const response = await fetch(`/api/admin/drops/${drop.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...drop,
-          active: !drop.active,
+          name: drop.name,
+          description: drop.description,
+          date: drop.date,
+          image: drop.image,
+          active: !wasActive,
         }),
       });
 
-      if (response.ok) {
+      if (!response.ok) {
+        // Revert on error
         fetchDrops();
       }
     } catch (error) {
       console.error('Failed to toggle drop:', error);
+      // Revert on error
+      fetchDrops();
     }
   };
 

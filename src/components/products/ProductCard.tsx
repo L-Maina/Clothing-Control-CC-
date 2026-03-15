@@ -151,29 +151,29 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        {/* Front Image - Default view */}
-        <motion.img
-          src={displayFrontImage}
-          alt={product.name}
-          onError={handleImageError}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-          initial={{ opacity: 1 }}
-          animate={{ opacity: isHovered && hasMultipleImages ? 0 : 1 }}
-          transition={{ duration: 0.3 }}
-        />
-
-        {/* Back Image - Shows on hover */}
+        {/* Back Image - Shows on hover (rendered first, underneath) */}
         {hasMultipleImages && (
           <motion.img
             src={displayBackImage}
             alt={`${product.name} back view`}
             onError={handleImageError}
-            className="absolute inset-0 w-full h-full object-cover"
+            className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             initial={{ opacity: 0 }}
             animate={{ opacity: isHovered ? 1 : 0 }}
             transition={{ duration: 0.3 }}
           />
         )}
+
+        {/* Front Image - Default view (rendered on top) */}
+        <motion.img
+          src={displayFrontImage}
+          alt={product.name}
+          onError={handleImageError}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 relative z-10"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: isHovered && hasMultipleImages ? 0 : 1 }}
+          transition={{ duration: 0.3 }}
+        />
 
         {/* Back view indicator - shows when hovering and has multiple images */}
         <AnimatePresence>
