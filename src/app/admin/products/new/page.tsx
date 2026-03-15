@@ -23,6 +23,7 @@ import {
   Plus,
   Image as ImageIcon,
   Loader2,
+  Upload,
 } from 'lucide-react';
 
 interface Category {
@@ -51,6 +52,7 @@ export default function NewProductPage() {
   });
   const [images, setImages] = useState<string[]>([]);
   const [imageUrl, setImageUrl] = useState('');
+  const [uploading, setUploading] = useState(false);
   const [colors, setColors] = useState<string[]>(['']);
   const [sizes, setSizes] = useState<string[]>(['']);
 
@@ -101,6 +103,36 @@ export default function NewProductPage() {
     if (imageUrl.trim() && !images.includes(imageUrl.trim())) {
       setImages([...images, imageUrl.trim()]);
       setImageUrl('');
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch('/api/admin/upload', {
+        method: 'POST',
+        body: formData,
+      });
+
+      const data = await response.json();
+      if (response.ok && data.url) {
+        setImages([...images, data.url]);
+      } else {
+        alert(data.error || 'Failed to upload image');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert('Failed to upload image');
+    } finally {
+      setUploading(false);
+      // Reset the file input
+      e.target.value = '';
     }
   };
 
@@ -198,25 +230,58 @@ export default function NewProductPage() {
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Product Images</h3>
                 
-                {/* Image Input */}
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    type="url"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                    onKeyPress={handleImageKeyPress}
-                    placeholder="Paste image URL and press Enter or click Add"
-                    className="flex-1 bg-zinc-800 border-white/10 text-white placeholder:text-white/40 focus:border-amber-400"
-                  />
-                  <Button
-                    type="button"
-                    onClick={addImage}
-                    disabled={!imageUrl.trim()}
-                    className="bg-amber-400 hover:bg-amber-300 text-black font-bold shrink-0"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add
-                  </Button>
+                {/* Upload Options */}
+                <div className="space-y-4 mb-4">
+                  {/* File Upload */}
+                  <div>
+                    <Label className="text-white/60 mb-2 block">Upload from Device</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,image/gif"
+                        onChange={handleFileUpload}
+                        disabled={uploading}
+                        className="bg-zinc-800 border-white/10 text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-amber-400 file:text-black file:font-bold file:cursor-pointer"
+                      />
+                      {uploading && (
+                        <div className="flex items-center text-amber-400">
+                          <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                          <span>Uploading...</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Divider */}
+                  <div className="flex items-center gap-4">
+                    <div className="flex-1 h-px bg-white/10"></div>
+                    <span className="text-white/40 text-sm">OR</span>
+                    <div className="flex-1 h-px bg-white/10"></div>
+                  </div>
+
+                  {/* URL Input */}
+                  <div>
+                    <Label className="text-white/60 mb-2 block">Add via URL</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        type="url"
+                        value={imageUrl}
+                        onChange={(e) => setImageUrl(e.target.value)}
+                        onKeyPress={handleImageKeyPress}
+                        placeholder="Paste image URL and press Enter or click Add"
+                        className="flex-1 bg-zinc-800 border-white/10 text-white placeholder:text-white/40 focus:border-amber-400"
+                      />
+                      <Button
+                        type="button"
+                        onClick={addImage}
+                        disabled={!imageUrl.trim()}
+                        className="bg-amber-400 hover:bg-amber-300 text-black font-bold shrink-0"
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add
+                      </Button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Image Grid */}
