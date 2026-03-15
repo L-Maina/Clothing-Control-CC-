@@ -181,6 +181,9 @@ let globalReconnectAttempts = 0;
 const maxReconnectAttempts = 5;
 const baseReconnectDelay = 1000;
 
+// BroadcastChannel for cross-tab communication (works on Vercel too!)
+let settingsChannel: BroadcastChannel | null = null;
+
 // SSE Hook for real-time updates
 export function useRealtimeSync() {
   const setSettings = useSettingsStore((state) => state.setSettings);
@@ -284,6 +287,7 @@ export function useRealtimeSync() {
 export function useRealtime() {
   const { connect } = useRealtimeSync();
   const { fetchSettings, fetchSocials } = useLiveSettings();
+  const setSettings = useSettingsStore((state) => state.setSettings);
 
   // Initialize on mount (client-side only)
   useEffect(() => {
@@ -293,8 +297,30 @@ export function useRealtime() {
     fetchSettings();
     fetchSocials();
     
-    // Connect to SSE for real-time updates (may not work in serverless, but harmless)
+    // Connect to SSE for real-time updates (works locally)
     connect();
+    
+    // Set up BroadcastChannel for cross-tab communication (works on Vercel!)
+    if (!settingsChannel) {
+      settingsChannel = new BroadcastChannel('clothing-ctrl-settings-sync');
+    }
+    
+    const handleMessage = (event: MessageEvent) => {
+      if (event.data.type === 'SETTINGS_UPDATED') {
+        // Immediately update settings from the broadcast
+        if (event.data.settings) {
+          setSettings(event.data.settings);
+        } else {
+          // Fallback: fetch from API
+          fetchSettings();
+        }
+      }
+      if (event.data.type === 'SOCIALS_UPDATED') {
+        fetchSocials();
+      }
+    };
+    
+    settingsChannel.addEventListener('message', handleMessage);
     
     // Re-fetch settings when window gains focus (tab switch, etc.)
     const handleFocus = () => {
@@ -306,9 +332,10 @@ export function useRealtime() {
     
     return () => {
       window.removeEventListener('focus', handleFocus);
+      settingsChannel?.removeEventListener('message', handleMessage);
       // Don't disconnect SSE - keep it alive for other components
     };
-  }, [connect, fetchSettings, fetchSocials]);
+  }, [connect, fetchSettings, fetchSocials, setSettings]);
 
   return {
     isConnected: () => globalEventSource?.readyState === EventSource.OPEN,
@@ -317,4 +344,33 @@ export function useRealtime() {
       fetchSocials();
     },
   };
+}
+
+// Function to broadcast settings updates (call this from admin after saving)
+export function broadcastSettingsUpdate(settings: Partial<StoreSettings>) {
+  if (typeof window === 'undefined') return;
+  
+  if (!settingsChannel) {
+    settingsChannel = new BroadcastChannel('clothing-ctrl-settings-sync');
+  }
+  
+  settingsChannel.postMessage({
+    type: 'SETTINGS_UPDATED',
+    settings,
+    timestamp: Date.now(),
+  });
+}
+
+// Function to broadcast socials updates
+export function broadcastSocialsUpdate() {
+  if (typeof window === 'undefined') return;
+  
+  if (!settingsChannel) {
+    settingsChannel = new BroadcastChannel('clothing-ctrl-settings-sync');
+  }
+  
+  settingsChannel.postMessage({
+    type: 'SOCIALS_UPDATED',
+    timestamp: Date.now(),
+  });
 }

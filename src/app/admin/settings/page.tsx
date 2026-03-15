@@ -17,7 +17,9 @@ import {
   Megaphone,
   Save,
   Loader2,
+  CheckCircle,
 } from 'lucide-react';
+import { broadcastSettingsUpdate } from '@/hooks/useRealtime';
 
 interface StoreSettings {
   id: string;
@@ -63,6 +65,7 @@ export default function AdminSettings() {
   const [settings, setSettings] = useState<StoreSettings>(defaultSettings);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -83,6 +86,7 @@ export default function AdminSettings() {
 
   const handleSave = async () => {
     setSaving(true);
+    setSaved(false);
     try {
       const response = await fetch('/api/admin/settings', {
         method: 'POST',
@@ -93,6 +97,27 @@ export default function AdminSettings() {
       if (response.ok) {
         const data = await response.json();
         setSettings({ ...defaultSettings, ...data.settings });
+        
+        // Broadcast the update to all open tabs (customer site, etc.)
+        broadcastSettingsUpdate({
+          storeName: data.settings.storeName,
+          storeDescription: data.settings.storeDescription,
+          storeEmail: data.settings.storeEmail,
+          storePhone: data.settings.storePhone,
+          addressLine1: data.settings.addressLine1,
+          addressLine2: data.settings.addressLine2,
+          city: data.settings.city,
+          country: data.settings.country,
+          openHour: data.settings.openHour,
+          closeHour: data.settings.closeHour,
+          openDays: data.settings.openDays,
+          bannerEnabled: data.settings.bannerEnabled,
+          bannerText: data.settings.bannerText,
+          bannerLink: data.settings.bannerLink,
+        });
+        
+        setSaved(true);
+        setTimeout(() => setSaved(false), 3000);
       }
     } catch (error) {
       console.error('Failed to save settings:', error);
@@ -122,16 +147,18 @@ export default function AdminSettings() {
           <p className="text-white/40">Manage your store information and preferences</p>
         </div>
         <Button 
-          className="bg-amber-400 hover:bg-amber-300 text-black font-bold"
+          className={saved ? "bg-green-500 hover:bg-green-500 text-black font-bold" : "bg-amber-400 hover:bg-amber-300 text-black font-bold"}
           onClick={handleSave}
           disabled={saving}
         >
           {saving ? (
             <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : saved ? (
+            <CheckCircle className="w-4 h-4 mr-2" />
           ) : (
             <Save className="w-4 h-4 mr-2" />
           )}
-          Save Changes
+          {saved ? 'Saved!' : 'Save Changes'}
         </Button>
       </div>
 

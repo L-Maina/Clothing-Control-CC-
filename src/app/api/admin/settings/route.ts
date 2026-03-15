@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { emitSyncEvent } from '@/lib/sync-events';
 
 export async function GET() {
   try {
@@ -87,14 +86,6 @@ export async function POST(request: Request) {
         },
       });
     }
-
-    // Emit sync event for real-time updates
-    await emitSyncEvent('SETTINGS_UPDATE', 'UPDATE', {
-      storeName: settings.storeName,
-      bannerEnabled: settings.bannerEnabled,
-      bannerText: settings.bannerText,
-      bannerLink: settings.bannerLink,
-    });
 
     return NextResponse.json({ settings });
   } catch (error) {
