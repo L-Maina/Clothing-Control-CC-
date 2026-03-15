@@ -51,7 +51,7 @@ export function Newsletter() {
   const showLoginPrompt = !isLoggedIn;
 
   return (
-    <section className="py-20 lg:py-28 bg-zinc-950 relative overflow-hidden">
+    <section id="newsletter" className="py-20 lg:py-28 bg-zinc-950 relative overflow-hidden">
       {/* Background Gradient */}
       <div className="absolute inset-0">
         <div className="absolute top-1/2 left-1/4 w-96 h-96 bg-amber-400/5 rounded-full blur-3xl -translate-y-1/2" />

@@ -147,6 +147,9 @@ export function LimitedDrop() {
                 </Button>
               </Link>
               <Button
+                onClick={() => {
+                  document.getElementById('newsletter')?.scrollIntoView({ behavior: 'smooth' });
+                }}
                 className="border border-white/30 !bg-transparent text-white hover:!bg-white/10 py-4 px-8 rounded-none transition-colors"
               >
                 GET NOTIFIED
