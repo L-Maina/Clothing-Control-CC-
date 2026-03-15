@@ -22,6 +22,7 @@ import {
   User,
   Star,
   Loader2,
+  Clock,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ const navigation = [
   { name: 'Products', href: '/admin/products', icon: Package },
   { name: 'Orders', href: '/admin/orders', icon: ShoppingBag },
   { name: 'Customers', href: '/admin/customers', icon: Users },
+  { name: 'Drops', href: '/admin/drops', icon: Clock },
   { name: 'Subscribers', href: '/admin/subscribers', icon: Mail },
   { name: 'Reviews', href: '/admin/reviews', icon: Star },
   { name: 'Community', href: '/admin/community', icon: Image },
