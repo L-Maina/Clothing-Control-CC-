@@ -5,7 +5,7 @@ import { ArrowRight, MapPin, Clock, Truck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { useEffect, useState, useMemo } from 'react';
-import { useSettingsStore } from '@/hooks/useRealtime';
+import { useSettingsStore, useRealtime } from '@/hooks/useRealtime';
 import { cn } from '@/lib/utils';
 
 // Fashion icons for floating elements
@@ -135,7 +135,10 @@ export function Hero() {
   // Track client-side mount state
   const [mounted, setMounted] = useState(false);
   
-  // Get banner settings from store
+  // Initialize real-time sync for settings
+  useRealtime();
+  
+  // Get settings from store
   const settings = useSettingsStore((state) => state.settings);
   
   // Initialize banner dismissed state from sessionStorage (lazy initialization)
@@ -146,6 +149,27 @@ export function Hero() {
   
   // Calculate if banner is visible
   const bannerVisible = settings.bannerEnabled && settings.bannerText && !bannerDismissed;
+  
+  // Format hours
+  const formatHours = () => {
+    if (settings.openHour && settings.closeHour) {
+      const openHour = parseInt(settings.openHour.split(':')[0]);
+      const closeHour = parseInt(settings.closeHour.split(':')[0]);
+      const ampm = (h: number) => h >= 12 ? 'pm' : 'am';
+      const formatHour = (h: number) => h > 12 ? h - 12 : h;
+      return `${formatHour(openHour)}${ampm(openHour)} - ${formatHour(closeHour)}${ampm(closeHour)}`;
+    }
+    return '12pm - 6pm';
+  };
+  
+  // Format location
+  const formatLocation = () => {
+    const parts = [];
+    if (settings.city) parts.push(settings.city);
+    if (settings.addressLine1) parts.push(settings.addressLine1);
+    if (settings.addressLine2) parts.push(settings.addressLine2);
+    return parts.length > 0 ? parts.join(' • ') : 'Nairobi CBD • Cargen House, Harambee Ave • Rm 310';
+  };
   
   // Generate floating items only once on client side to avoid hydration mismatch
   const floatingItems = useMemo(() => generateFloatingItems(25), []);
@@ -253,7 +277,7 @@ export function Hero() {
             className="flex items-center justify-center gap-2 text-white/50 text-sm mb-8"
           >
             <MapPin className="w-4 h-4 text-amber-400" />
-            <span>Nairobi CBD • Cargen House, Harambee Ave • Rm 310</span>
+            <span>{formatLocation()}</span>
           </motion.div>
 
           {/* Main Logo */}
@@ -381,16 +405,20 @@ export function Hero() {
             transition={{ duration: 0.6, delay: 0.8 }}
           >
             {['Gucci', 'Prada', 'Balenciaga', 'Bape', 'Diesel', 'Chrome Hearts', 'Carhartt', 'Thrifted', 'Custom'].map((brand, i) => (
-              <motion.span 
+              <Link 
                 key={brand} 
-                className="px-3 py-1.5 border border-white/10 rounded-full text-white/50 text-xs lg:text-sm hover:border-amber-400/50 hover:text-amber-400 hover:bg-amber-400/5 transition-all cursor-default"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.9 + i * 0.05 }}
-                whileHover={{ scale: 1.05 }}
+                href={`/shop?brand=${encodeURIComponent(brand)}`}
               >
-                {brand}
-              </motion.span>
+                <motion.span 
+                  className="px-3 py-1.5 border border-white/10 rounded-full text-white/50 text-xs lg:text-sm hover:border-amber-400/50 hover:text-amber-400 hover:bg-amber-400/5 transition-all cursor-pointer inline-block"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, delay: 0.9 + i * 0.05 }}
+                  whileHover={{ scale: 1.05 }}
+                >
+                  {brand}
+                </motion.span>
+              </Link>
             ))}
           </motion.div>
 
@@ -441,7 +469,7 @@ export function Hero() {
               >
                 <Clock className="w-4 h-4 text-amber-400" />
               </motion.div>
-              <span>Mon - Sat: 12pm - 6pm</span>
+              <span>{settings.openDays || 'Mon - Sat'}: {formatHours()}</span>
             </div>
             <div className="flex items-center gap-2 text-white/50">
               <motion.div
@@ -459,7 +487,7 @@ export function Hero() {
               >
                 <MapPin className="w-4 h-4 text-amber-400" />
               </motion.div>
-              <span>Nairobi, Kenya</span>
+              <span>{settings.city || 'Nairobi'}, {settings.country || 'Kenya'}</span>
             </div>
           </motion.div>
         </div>

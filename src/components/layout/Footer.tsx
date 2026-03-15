@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
-import { Instagram, MapPin, Clock, Mail, Globe } from 'lucide-react';
+import { Instagram, MapPin, Clock, Mail, Globe, Phone } from 'lucide-react';
 import { useLiveSettings, useRealtime } from '@/hooks/useRealtime';
 
 // Map platform names to icons
@@ -179,7 +179,7 @@ export function Footer() {
               )}
               {settings.storePhone && (
                 <li className="flex items-center gap-3">
-                  <span className="w-4 h-4 text-amber-400 flex-shrink-0 flex items-center justify-center">📞</span>
+                  <Phone className="w-4 h-4 text-amber-400 flex-shrink-0" />
                   <a href={`tel:${settings.storePhone}`} className="text-white/60 hover:text-amber-400 text-sm transition-colors">
                     {settings.storePhone}
                   </a>

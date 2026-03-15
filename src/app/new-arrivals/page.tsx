@@ -6,9 +6,6 @@ import { ArrowLeft, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 import { ProductCard } from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { CartDrawer } from '@/components/cart/CartDrawer';
 
 interface Product {
   id: string;
@@ -54,11 +51,7 @@ export default function NewArrivalsPage() {
   const hasMore = visibleCount < products.length;
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <Navbar />
-      <CartDrawer />
-      
-      <main className="flex-1 pt-24 pb-12">
+    <main className="pt-24 pb-12">
         <div className="container mx-auto px-4 lg:px-8">
           {/* Header */}
           <div className="mb-12">
@@ -134,7 +127,7 @@ export default function NewArrivalsPage() {
               <Button
                 onClick={() => setVisibleCount(prev => prev + 16)}
                 variant="outline"
-                className="border-white/20 text-white hover:bg-white hover:text-black px-8 py-6 rounded-none"
+                className="!border-white !bg-transparent text-white hover:!bg-white hover:!text-black px-8 py-6 rounded-none transition-colors"
               >
                 LOAD MORE
               </Button>
@@ -142,8 +135,5 @@ export default function NewArrivalsPage() {
           )}
         </div>
       </main>
-
-      <Footer />
-    </div>
   );
 }

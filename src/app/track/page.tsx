@@ -10,9 +10,6 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { CartDrawer } from '@/components/cart/CartDrawer';
 import { useToast } from '@/hooks/use-toast';
 
 export default function TrackOrderIndexPage() {
@@ -63,11 +60,7 @@ export default function TrackOrderIndexPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <Navbar />
-      <CartDrawer />
-      
-      <main className="flex-1 pt-24 pb-12">
+    <main className="pt-24 pb-12">
         <div className="container mx-auto px-4 lg:px-8 max-w-lg">
           {/* Header */}
           <div className="mb-8 text-center">
@@ -178,8 +171,5 @@ export default function TrackOrderIndexPage() {
           </motion.div>
         </div>
       </main>
-
-      <Footer />
-    </div>
   );
 }

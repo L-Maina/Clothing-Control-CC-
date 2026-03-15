@@ -230,25 +230,66 @@ export default function NewProductPage() {
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Product Images</h3>
                 
-                {/* Upload Options */}
-                <div className="space-y-4 mb-4">
-                  {/* File Upload */}
+                {/* Image Grid - Show at top */}
+                {images.length > 0 && (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    {images.map((img, index) => (
+                      <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-800 group">
+                        <img src={img} alt="" className="w-full h-full object-cover" />
+                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                          <button
+                            type="button"
+                            onClick={() => removeImage(index)}
+                            className="p-2 bg-red-500/80 rounded-full text-white hover:bg-red-500 transition-colors"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                        {index === 0 && (
+                          <div className="absolute top-2 left-2">
+                            <Badge className="bg-amber-400 text-black text-xs font-bold">Main</Badge>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Upload Area */}
+                <div className="space-y-4">
+                  {/* File Upload - Styled Button */}
                   <div>
                     <Label className="text-white/60 mb-2 block">Upload from Device</Label>
-                    <div className="flex gap-2">
-                      <Input
+                    <div className="flex items-center gap-3">
+                      <input
                         type="file"
+                        id="file-upload"
                         accept="image/jpeg,image/png,image/webp,image/gif"
                         onChange={handleFileUpload}
                         disabled={uploading}
-                        className="bg-zinc-800 border-white/10 text-white file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:bg-amber-400 file:text-black file:font-bold file:cursor-pointer"
+                        className="hidden"
                       />
-                      {uploading && (
-                        <div className="flex items-center text-amber-400">
-                          <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                          <span>Uploading...</span>
-                        </div>
-                      )}
+                      <label
+                        htmlFor="file-upload"
+                        className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-lg font-medium cursor-pointer transition-all ${
+                          uploading 
+                            ? 'bg-zinc-700 text-white/40 cursor-not-allowed' 
+                            : 'bg-amber-400 hover:bg-amber-300 text-black'
+                        }`}
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="w-4 h-4" />
+                            Choose File
+                          </>
+                        )}
+                      </label>
+                      <span className="text-white/40 text-sm">JPG, PNG, WebP, GIF • Max 10MB</span>
                     </div>
                   </div>
 
@@ -284,27 +325,14 @@ export default function NewProductPage() {
                   </div>
                 </div>
 
-                {/* Image Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {images.map((img, index) => (
-                    <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-800">
-                      <img src={img} alt="" className="w-full h-full object-cover" />
-                      <button
-                        type="button"
-                        onClick={() => removeImage(index)}
-                        className="absolute top-2 right-2 p-1 bg-black/50 rounded-full text-white hover:bg-red-500/50 transition-colors"
-                      >
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                  {images.length === 0 && (
-                    <div className="aspect-square rounded-lg border-2 border-dashed border-white/20 flex flex-col items-center justify-center col-span-2 md:col-span-4">
-                      <ImageIcon className="w-8 h-8 text-white/20 mb-2" />
-                      <span className="text-white/40 text-sm">No images added yet</span>
-                    </div>
-                  )}
-                </div>
+                {/* Empty State */}
+                {images.length === 0 && (
+                  <div className="mt-6 p-8 rounded-lg border-2 border-dashed border-white/20 flex flex-col items-center justify-center">
+                    <ImageIcon className="w-12 h-12 text-white/20 mb-3" />
+                    <span className="text-white/40 text-sm mb-1">No images added yet</span>
+                    <span className="text-white/30 text-xs">Upload files or paste URLs above</span>
+                  </div>
+                )}
               </CardContent>
             </Card>
 

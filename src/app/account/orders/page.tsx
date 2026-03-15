@@ -36,11 +36,11 @@ interface Order {
 }
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
-  PENDING: { label: 'Pending', color: 'bg-yellow-100 text-yellow-800', icon: Clock },
-  PROCESSING: { label: 'Processing', color: 'bg-blue-100 text-blue-800', icon: Package },
-  SHIPPED: { label: 'Shipped', color: 'bg-purple-100 text-purple-800', icon: Truck },
-  DELIVERED: { label: 'Delivered', color: 'bg-green-100 text-green-800', icon: CheckCircle },
-  CANCELLED: { label: 'Cancelled', color: 'bg-red-100 text-red-800', icon: Package },
+  PENDING: { label: 'Pending', color: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30', icon: Clock },
+  PROCESSING: { label: 'Processing', color: 'bg-blue-500/20 text-blue-400 border-blue-500/30', icon: Package },
+  SHIPPED: { label: 'Shipped', color: 'bg-purple-500/20 text-purple-400 border-purple-500/30', icon: Truck },
+  DELIVERED: { label: 'Delivered', color: 'bg-green-500/20 text-green-400 border-green-500/30', icon: CheckCircle },
+  CANCELLED: { label: 'Cancelled', color: 'bg-red-500/20 text-red-400 border-red-500/30', icon: Package },
 };
 
 export default function OrdersPage() {
@@ -95,40 +95,40 @@ export default function OrdersPage() {
 
   if (!isLoggedIn || !user) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
+      <main className="flex-1 pt-24 pb-12">
         <div className="container mx-auto px-4 max-w-4xl">
-          <Card>
+          <Card className="bg-zinc-900 border-white/10">
             <CardContent className="p-12 text-center">
-              <Package className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <h2 className="text-xl font-semibold mb-2">Sign in to view your orders</h2>
-              <p className="text-gray-600 mb-6">
+              <Package className="w-16 h-16 mx-auto text-white/40 mb-4" />
+              <h2 className="text-xl font-semibold text-white mb-2">Sign in to view your orders</h2>
+              <p className="text-white/60 mb-6">
                 Please sign in to your account to view your order history.
               </p>
-              <Button asChild>
+              <Button asChild className="bg-amber-400 hover:bg-amber-300 text-black">
                 <Link href="/">Sign In</Link>
               </Button>
             </CardContent>
           </Card>
         </div>
-      </div>
+      </main>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <main className="flex-1 pt-24 pb-12">
       <div className="container mx-auto px-4 max-w-4xl">
         {/* Header */}
         <div className="mb-8">
           <div className="flex items-center gap-4 mb-2">
             <button
               onClick={() => router.push('/account')}
-              className="p-2 rounded-lg bg-white border border-gray-200 text-gray-600 hover:text-gray-900 hover:bg-gray-50 transition-colors"
+              className="p-2 rounded-lg bg-zinc-900 border border-white/10 text-white/60 hover:text-white hover:bg-zinc-800 transition-colors"
             >
               <ArrowLeft className="w-5 h-5" />
             </button>
-            <h1 className="text-3xl font-bold">My Orders</h1>
+            <h1 className="text-3xl font-bold text-white">My Orders</h1>
           </div>
-          <p className="text-gray-600">
+          <p className="text-white/60">
             Track your orders and view your purchase history
           </p>
         </div>
@@ -157,22 +157,22 @@ export default function OrdersPage() {
         {loading ? (
           <div className="space-y-4">
             {[1, 2, 3].map((i) => (
-              <Card key={i}>
+              <Card key={i} className="bg-zinc-900 border-white/10">
                 <CardContent className="p-6">
-                  <Skeleton className="h-20 w-full" />
+                  <Skeleton className="h-20 w-full bg-zinc-800" />
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : orders.length === 0 ? (
-          <Card>
+          <Card className="bg-zinc-900 border-white/10">
             <CardContent className="p-12 text-center">
-              <Package className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-              <h2 className="text-xl font-semibold mb-2">No orders yet</h2>
-              <p className="text-gray-600 mb-6">
+              <Package className="w-16 h-16 mx-auto text-white/40 mb-4" />
+              <h2 className="text-xl font-semibold text-white mb-2">No orders yet</h2>
+              <p className="text-white/60 mb-6">
                 You have not placed any orders yet. Start shopping!
               </p>
-              <Button asChild>
+              <Button asChild className="bg-amber-400 hover:bg-amber-300 text-black">
                 <Link href="/">Browse Products</Link>
               </Button>
             </CardContent>
@@ -184,12 +184,12 @@ export default function OrdersPage() {
               const StatusIcon = status.icon;
 
               return (
-                <Card key={order.id} className="overflow-hidden">
-                  <CardHeader className="bg-gray-50 border-b">
+                <Card key={order.id} className="overflow-hidden bg-zinc-900 border-white/10">
+                  <CardHeader className="bg-zinc-800/50 border-b border-white/10">
                     <div className="flex items-center justify-between flex-wrap gap-4">
                       <div>
-                        <CardTitle className="text-lg">{order.orderNumber}</CardTitle>
-                        <p className="text-sm text-gray-600">
+                        <CardTitle className="text-lg text-white">{order.orderNumber}</CardTitle>
+                        <p className="text-sm text-white/60">
                           {new Date(order.createdAt).toLocaleDateString('en-KE', {
                             year: 'numeric',
                             month: 'long',
@@ -197,7 +197,7 @@ export default function OrdersPage() {
                           })}
                         </p>
                       </div>
-                      <Badge className={status.color}>
+                      <Badge className={`${status.color} border`}>
                         <StatusIcon className="w-4 h-4 mr-1" />
                         {status.label}
                       </Badge>
@@ -208,7 +208,7 @@ export default function OrdersPage() {
                     <div className="space-y-4 mb-6">
                       {order.items.map((item) => (
                         <div key={item.id} className="flex items-center gap-4">
-                          <div className="w-16 h-16 bg-gray-100 rounded overflow-hidden flex-shrink-0">
+                          <div className="w-16 h-16 bg-zinc-800 rounded overflow-hidden flex-shrink-0">
                             {item.productImage ? (
                               <img
                                 src={item.productImage}
@@ -217,17 +217,17 @@ export default function OrdersPage() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <Package className="w-6 h-6 text-gray-400" />
+                                <Package className="w-6 h-6 text-white/40" />
                               </div>
                             )}
                           </div>
                           <div className="flex-1">
-                            <p className="font-medium">{item.productName}</p>
-                            <p className="text-sm text-gray-600">
+                            <p className="font-medium text-white">{item.productName}</p>
+                            <p className="text-sm text-white/60">
                               {item.color} / {item.size} × {item.quantity}
                             </p>
                           </div>
-                          <p className="font-medium">
+                          <p className="font-medium text-white">
                             {order.currency} {item.price.toLocaleString()}
                           </p>
                         </div>
@@ -236,8 +236,8 @@ export default function OrdersPage() {
 
                     {/* Tracking Info */}
                     {order.trackingNumber && (
-                      <div className="bg-blue-50 p-4 rounded mb-4">
-                        <p className="text-sm text-blue-800 mb-1">
+                      <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded mb-4">
+                        <p className="text-sm text-blue-400 mb-1">
                           <Truck className="w-4 h-4 inline mr-1" />
                           Tracking Number: <strong>{order.trackingNumber}</strong>
                         </p>
@@ -246,7 +246,7 @@ export default function OrdersPage() {
                             href={order.trackingUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline"
+                            className="text-sm text-blue-300 hover:text-blue-200 hover:underline"
                           >
                             Track your package <ExternalLink className="w-3 h-3 inline" />
                           </a>
@@ -255,10 +255,10 @@ export default function OrdersPage() {
                     )}
 
                     {/* Order Total */}
-                    <div className="flex items-center justify-between pt-4 border-t">
+                    <div className="flex items-center justify-between pt-4 border-t border-white/10">
                       <div>
-                        <p className="text-sm text-gray-600">Total</p>
-                        <p className="text-xl font-bold">
+                        <p className="text-sm text-white/60">Total</p>
+                        <p className="text-xl font-bold text-white">
                           {order.currency} {order.total.toLocaleString()}
                         </p>
                       </div>
@@ -267,6 +267,7 @@ export default function OrdersPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => handlePrintReceipt(order.id)}
+                          className="border-white/20 text-white hover:bg-white/10"
                         >
                           <Download className="w-4 h-4 mr-1" />
                           Receipt
@@ -276,6 +277,7 @@ export default function OrdersPage() {
                             variant="outline"
                             size="sm"
                             onClick={() => handleRequestReview(order.id)}
+                            className="border-amber-400/50 text-amber-400 hover:bg-amber-400/10"
                           >
                             <Star className="w-4 h-4 mr-1" />
                             Review
@@ -290,6 +292,6 @@ export default function OrdersPage() {
           </div>
         )}
       </div>
-    </div>
+    </main>
   );
 }

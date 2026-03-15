@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Eye, Heart, RotateCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -89,10 +89,19 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState(0);
   const [imageError, setImageError] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const { addItem } = useCartStore();
   const { openQuickView } = useUIStore();
   const { formatPrice } = useCurrencyStore();
   const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
+
+  // Detect mobile for touch-friendly interactions
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images;
   const colors = typeof product.colors === 'string' ? JSON.parse(product.colors) : product.colors;
@@ -105,6 +114,9 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
 
   // Check if product has multiple images (for back view)
   const hasMultipleImages = images.length > 1;
+
+  // Show actions on mobile or when hovered
+  const showActions = isMobile || isHovered;
 
   const handleAddToCart = () => {
     addItem({
@@ -182,7 +194,7 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 10 }}
-              className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-white/80 text-xs flex items-center gap-1"
+              className="absolute bottom-3 right-3 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-white/80 text-xs flex items-center gap-1 z-10"
             >
               <RotateCw className="w-3 h-3" />
               BACK VIEW
@@ -190,9 +202,9 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
           )}
         </AnimatePresence>
 
-        {/* Overlay */}
+        {/* Overlay - only on desktop hover */}
         <motion.div 
-          className="absolute inset-0 bg-black/20 pointer-events-none"
+          className="absolute inset-0 bg-black/20 pointer-events-none hidden md:block"
           initial={{ opacity: 0 }}
           animate={{ opacity: isHovered ? 1 : 0 }}
           transition={{ duration: 0.3 }}
@@ -227,16 +239,18 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
           )}
         </div>
 
-        {/* Quick Actions - Top Left */}
+        {/* Quick Actions - Top Left - Always visible on mobile, hover on desktop */}
         <motion.div
-          className="absolute top-3 left-3 flex flex-col gap-2"
+          className="absolute top-3 left-3 flex flex-col gap-2 z-20"
           initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: isHovered ? 1 : 0, x: isHovered ? 0 : -20 }}
+          animate={{ opacity: showActions ? 1 : 0, x: showActions ? 0 : -20 }}
           transition={{ duration: 0.3 }}
+          style={{ pointerEvents: showActions ? 'auto' : 'none' }}
         >
           <button 
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               handleToggleWishlist();
             }}
             className={cn(
@@ -245,15 +259,18 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
                 ? "bg-red-500 text-white" 
                 : "bg-white/10 hover:bg-amber-400 hover:text-black text-white"
             )}
+            aria-label={isLiked ? "Remove from wishlist" : "Add to wishlist"}
           >
             <Heart className={cn("w-4 h-4", isLiked && "fill-current")} />
           </button>
           <button
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               openQuickView(product.id);
             }}
             className="w-9 h-9 bg-white/10 backdrop-blur-sm hover:bg-amber-400 hover:text-black text-white rounded-full flex items-center justify-center transition-all"
+            aria-label="Quick view"
           >
             <Eye className="w-4 h-4" />
           </button>
@@ -261,14 +278,16 @@ export function ProductCard({ product, index = 0 }: ProductCardProps) {
 
         {/* Quick Add */}
         <motion.div
-          className="absolute bottom-0 left-0 right-0 p-3"
+          className="absolute bottom-0 left-0 right-0 p-3 z-20"
           initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: isHovered ? 1 : 0, y: isHovered ? 0 : 20 }}
+          animate={{ opacity: showActions ? 1 : 0, y: showActions ? 0 : 20 }}
           transition={{ duration: 0.3 }}
+          style={{ pointerEvents: showActions ? 'auto' : 'none' }}
         >
           <Button
             onClick={(e) => {
               e.stopPropagation();
+              e.preventDefault();
               handleAddToCart();
             }}
             className="w-full bg-amber-400 hover:!bg-amber-300 text-black font-bold py-3 rounded-none group/btn transition-colors"

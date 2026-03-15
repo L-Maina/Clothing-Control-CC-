@@ -43,14 +43,14 @@ export function AnnouncementBanner() {
         />
       </div>
 
-      <div className="container mx-auto px-4 py-2.5 relative">
-        <div className="flex items-center justify-center gap-2">
+      <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-2.5 relative">
+        <div className="flex items-center justify-center gap-1 sm:gap-2 pr-6 sm:pr-8">
           {/* Animated icon */}
           <motion.span
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
             transition={{ type: 'spring', stiffness: 500, damping: 25 }}
-            className="text-lg"
+            className="text-sm sm:text-lg flex-shrink-0"
           >
             🔥
           </motion.span>
@@ -60,7 +60,7 @@ export function AnnouncementBanner() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-sm sm:text-base font-bold tracking-tight text-center"
+            className="text-xs sm:text-sm md:text-base font-bold tracking-tight text-center truncate"
           >
             {settings.bannerText}
           </motion.p>
@@ -71,7 +71,7 @@ export function AnnouncementBanner() {
               initial={{ opacity: 0, x: -10 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.2 }}
-              className="hidden sm:flex items-center gap-1 ml-2"
+              className="hidden sm:flex items-center gap-1 ml-2 flex-shrink-0"
             >
               <ChevronRight className="w-4 h-4" />
               <span className="text-xs font-semibold underline underline-offset-2">
@@ -79,17 +79,17 @@ export function AnnouncementBanner() {
               </span>
             </motion.div>
           )}
-
-          {/* Dismiss button */}
-          <button
-            onClick={handleDismiss}
-            className="absolute right-2 sm:right-4 p-1 hover:bg-black/10 rounded-full transition-colors"
-            aria-label="Dismiss banner"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
       </div>
+
+      {/* Dismiss button - positioned outside the content flow */}
+      <button
+        onClick={handleDismiss}
+        className="absolute top-1/2 -translate-y-1/2 right-1 sm:right-3 p-1 hover:bg-black/10 rounded-full transition-colors"
+        aria-label="Dismiss banner"
+      >
+        <X className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+      </button>
     </div>
   );
 

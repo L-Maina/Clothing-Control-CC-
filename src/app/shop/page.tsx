@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Shirt, Footprints, Gem, Filter, X, ArrowLeft } from 'lucide-react';
 import Link from 'next/link';
 import { ProductCard } from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { CartDrawer } from '@/components/cart/CartDrawer';
 import { cn } from '@/lib/utils';
 
 interface Product {
@@ -53,14 +51,25 @@ const brandFilters = [
 const conditionFilters = ['All', 'New', 'Thrifting', 'Custom'];
 
 export default function ShopPage() {
+  const searchParams = useSearchParams();
+  const brandFromUrl = searchParams.get('brand');
+  
   const [activeTab, setActiveTab] = useState<ProductType>('CLOTHES');
   const [activeSubcategory, setActiveSubcategory] = useState('All');
-  const [activeBrand, setActiveBrand] = useState('All');
+  const [activeBrand, setActiveBrand] = useState(brandFromUrl || 'All');
   const [activeCondition, setActiveCondition] = useState('All');
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [visibleCount, setVisibleCount] = useState(16);
+
+  // Update brand when URL changes
+  useEffect(() => {
+    if (brandFromUrl) {
+      setActiveBrand(brandFromUrl);
+      setIsFilterOpen(true); // Open filter drawer to show the brand is selected
+    }
+  }, [brandFromUrl]);
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -115,21 +124,18 @@ export default function ShopPage() {
   }, [activeTab]);
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <Navbar />
-      <CartDrawer />
-      
-      <main className="flex-1 pt-24 pb-12">
-        <div className="container mx-auto px-4 lg:px-8">
-          {/* Header */}
-          <div className="mb-8">
-            <Link href="/" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-4">
-              <ArrowLeft className="w-4 h-4" />
-              Back to home
-            </Link>
-            <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">SHOP</h1>
-            <p className="text-white/50 mt-2">Explore our full collection of premium fashion</p>
-          </div>
+    <>
+    <main className="flex-1 pt-24 pb-12">
+      <div className="container mx-auto px-4 lg:px-8">
+        {/* Header */}
+        <div className="mb-8">
+          <Link href="/" className="inline-flex items-center gap-2 text-white/60 hover:text-white transition-colors mb-4">
+            <ArrowLeft className="w-4 h-4" />
+            Back to home
+          </Link>
+          <h1 className="text-4xl sm:text-5xl font-black text-white tracking-tight">SHOP</h1>
+          <p className="text-white/50 mt-2">Explore our full collection of premium fashion</p>
+        </div>
 
           {/* Type Tabs */}
           <div className="flex justify-center mb-8">
@@ -233,7 +239,8 @@ export default function ShopPage() {
             <div className="flex justify-center mt-12">
               <Button
                 onClick={() => setVisibleCount(prev => prev + 16)}
-                className="border border-white/20 !bg-transparent text-white hover:!bg-white hover:!text-black px-8 py-6 rounded-none transition-colors"
+                variant="outline"
+                className="!border-white !bg-transparent text-white hover:!bg-white hover:!text-black px-8 py-6 rounded-none transition-colors"
               >
                 LOAD MORE PRODUCTS
               </Button>
@@ -349,8 +356,6 @@ export default function ShopPage() {
           </motion.div>
         )}
       </AnimatePresence>
-
-      <Footer />
-    </div>
+    </>
   );
 }

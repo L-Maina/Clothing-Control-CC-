@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, Minus, Plus, Heart, Share2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useCartStore, useUIStore, useCurrencyStore } from '@/lib/store';
+import { useCartStore, useUIStore, useCurrencyStore, useWishlistStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 // Helper function to get color hex codes
@@ -56,39 +56,77 @@ export function QuickView() {
   const { isQuickViewOpen, quickViewProductId, closeQuickView } = useUIStore();
   const { addItem } = useCartStore();
   const { formatPrice } = useCurrencyStore();
+  const { addToWishlist, removeFromWishlist, isInWishlist } = useWishlistStore();
   const [product, setProduct] = useState<Record<string, unknown> | null>(null);
   const [selectedImage, setSelectedImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(0);
   const [selectedSize, setSelectedSize] = useState(0);
   const [quantity, setQuantity] = useState(1);
-  const [isLiked, setIsLiked] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
+  // Fetch product when modal opens with a new productId
   useEffect(() => {
-    if (quickViewProductId) {
-      fetch(`/api/products?id=${quickViewProductId}`)
-        .then(res => res.json())
-        .then(data => {
-          setProduct(data);
-        });
+    let isCancelled = false;
+    
+    if (quickViewProductId && isQuickViewOpen) {
+      // Start loading after the effect, not synchronously
+      const loadProduct = async () => {
+        if (isCancelled) return;
+        
+        setIsLoading(true);
+        setProduct(null);
+        
+        try {
+          const res = await fetch(`/api/products?id=${quickViewProductId}`);
+          const data = await res.json();
+          if (!isCancelled) {
+            setProduct(data);
+            setIsLoading(false);
+          }
+        } catch {
+          if (!isCancelled) {
+            setIsLoading(false);
+          }
+        }
+      };
+      
+      // Use requestAnimationFrame to defer state updates
+      requestAnimationFrame(loadProduct);
     }
-  }, [quickViewProductId]);
+    
+    return () => {
+      isCancelled = true;
+    };
+  }, [quickViewProductId, isQuickViewOpen]);
+
+  // Reset state when modal closes - use a separate ref to avoid cascading
+  const prevIsOpen = useRef(isQuickViewOpen);
+  useEffect(() => {
+    if (prevIsOpen.current && !isQuickViewOpen) {
+      // Modal just closed, reset state asynchronously
+      requestAnimationFrame(() => {
+        setSelectedImage(0);
+        setSelectedColor(0);
+        setSelectedSize(0);
+        setQuantity(1);
+        setProduct(null);
+      });
+    }
+    prevIsOpen.current = isQuickViewOpen;
+  }, [isQuickViewOpen]);
 
   const handleClose = () => {
     closeQuickView();
-    setProduct(null);
-    setSelectedImage(0);
-    setSelectedColor(0);
-    setSelectedSize(0);
-    setQuantity(1);
   };
 
-  if (!product) return null;
+  const images = product ? (typeof product.images === 'string' ? JSON.parse(product.images) : product.images || []) : [];
+  const colors = product ? (typeof product.colors === 'string' ? JSON.parse(product.colors) : product.colors || []) : [];
+  const sizes = product ? (typeof product.sizes === 'string' ? JSON.parse(product.sizes) : product.sizes || []) : [];
 
-  const images = typeof product.images === 'string' ? JSON.parse(product.images) : product.images || [];
-  const colors = typeof product.colors === 'string' ? JSON.parse(product.colors) : product.colors || [];
-  const sizes = typeof product.sizes === 'string' ? JSON.parse(product.sizes) : product.sizes || [];
+  const isLiked = product ? isInWishlist(product.id as string) : false;
 
   const handleAddToCart = () => {
+    if (!product) return;
     addItem({
       productId: product.id as string,
       name: product.name as string,
@@ -99,6 +137,21 @@ export function QuickView() {
       quantity,
     });
     handleClose();
+  };
+
+  const handleToggleWishlist = () => {
+    if (!product) return;
+    if (isLiked) {
+      removeFromWishlist(product.id as string);
+    } else {
+      addToWishlist({
+        productId: product.id as string,
+        name: product.name as string,
+        price: product.price as number,
+        image: images[0] || '',
+        brand: product.brand as string,
+      });
+    }
   };
 
   return (
@@ -131,187 +184,200 @@ export function QuickView() {
               <span className="hidden sm:inline">Back</span>
             </button>
 
-            <div className="grid md:grid-cols-2">
-              {/* Images */}
-              <div className="relative aspect-square bg-zinc-900">
-                <img
-                  src={images[selectedImage] || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&h=800&fit=crop'}
-                  alt={product.name as string}
-                  className="w-full h-full object-cover"
-                />
-                
-                {/* Thumbnails */}
-                {images.length > 1 && (
-                  <div className="absolute bottom-4 left-4 right-4 flex gap-2">
-                    {images.map((img: string, idx: number) => (
-                      <button
-                        key={idx}
-                        onClick={() => setSelectedImage(idx)}
-                        className={cn(
-                          "w-16 h-16 border-2 overflow-hidden transition-all",
-                          selectedImage === idx ? "border-amber-400" : "border-transparent opacity-60"
-                        )}
-                      >
-                        <img src={img} alt="" className="w-full h-full object-cover" />
-                      </button>
-                    ))}
-                  </div>
-                )}
+            {/* Loading State */}
+            {(isLoading || !product) && (
+              <div className="flex items-center justify-center min-h-[400px] p-8">
+                <div className="flex flex-col items-center gap-4">
+                  <div className="w-8 h-8 border-2 border-amber-400 border-t-transparent rounded-full animate-spin" />
+                  <p className="text-white/60">Loading product...</p>
+                </div>
               </div>
+            )}
 
-              {/* Info */}
-              <div className="p-6 lg:p-8">
-                {/* Brand */}
-                {product.brand && (
-                  <p className="text-amber-400 font-medium tracking-wide text-sm mb-2">
-                    {product.brand as string}
-                  </p>
-                )}
-
-                {/* Name */}
-                <h2 className="text-2xl lg:text-3xl font-bold text-white mb-2">
-                  {product.name as string}
-                </h2>
-
-                {/* Condition Badge */}
-                {product.condition && (
-                  <span className={cn(
-                    "inline-block text-xs font-bold px-3 py-1 tracking-wider mb-4",
-                    product.condition === 'NEW' ? "bg-amber-400 text-black" :
-                    product.condition === 'THRIFTED' ? "bg-purple-500 text-white" :
-                    "bg-blue-500 text-white"
-                  )}>
-                    {product.condition as string}
-                  </span>
-                )}
-
-                {/* Price */}
-                <div className="flex items-center gap-3 mb-6">
-                  <span className="text-2xl font-bold text-white">{formatPrice(product.price as number)}</span>
-                  {product.compareAt && (
-                    <span className="text-lg text-white/40 line-through">{formatPrice(product.compareAt as number)}</span>
+            {/* Product Content */}
+            {!isLoading && product && (
+              <div className="grid md:grid-cols-2">
+                {/* Images */}
+                <div className="relative aspect-square bg-zinc-900">
+                  <img
+                    src={images[selectedImage] || 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600&h=800&fit=crop'}
+                    alt={product.name as string}
+                    className="w-full h-full object-cover"
+                  />
+                  
+                  {/* Thumbnails */}
+                  {images.length > 1 && (
+                    <div className="absolute bottom-4 left-4 right-4 flex gap-2">
+                      {images.map((img: string, idx: number) => (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedImage(idx)}
+                          className={cn(
+                            "w-16 h-16 border-2 overflow-hidden transition-all",
+                            selectedImage === idx ? "border-amber-400" : "border-transparent opacity-60"
+                          )}
+                        >
+                          <img src={img} alt="" className="w-full h-full object-cover" />
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
 
-                {/* Description */}
-                <p className="text-white/60 text-sm leading-relaxed mb-6">
-                  {product.description as string}
-                </p>
+                {/* Info */}
+                <div className="p-6 lg:p-8">
+                  {/* Brand */}
+                  {product.brand && (
+                    <p className="text-amber-400 font-medium tracking-wide text-sm mb-2">
+                      {product.brand as string}
+                    </p>
+                  )}
 
-                {/* Color */}
-                {colors.length > 0 && (
-                  <div className="mb-4">
-                    <label className="block text-white text-sm font-medium mb-3">
-                      Color: <span className="text-amber-400">{colors[selectedColor]}</span>
-                    </label>
-                    <div className="flex gap-2">
-                      {colors.map((color: string, idx: number) => (
-                        <button
-                          key={color}
-                          onClick={() => setSelectedColor(idx)}
-                          className={cn(
-                            "w-8 h-8 rounded-full transition-all duration-200 flex items-center justify-center",
-                            selectedColor === idx 
-                              ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-black" 
-                              : "hover:scale-110"
-                          )}
-                          style={{
-                            backgroundColor: getColorHex(color),
-                            border: isLightColor(color) ? '1px solid rgba(255,255,255,0.2)' : 'none',
-                          }}
-                          title={color}
-                        >
-                          {selectedColor === idx && (
-                            <div className={cn(
-                              "w-2 h-2 rounded-full",
-                              isLightColor(color) ? "bg-black" : "bg-white"
-                            )} />
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  {/* Name */}
+                  <h2 className="text-2xl lg:text-3xl font-bold text-white mb-2">
+                    {product.name as string}
+                  </h2>
 
-                {/* Size */}
-                {sizes.length > 0 && (
-                  <div className="mb-6">
-                    <label className="block text-white text-sm font-medium mb-3">
-                      Size: <span className="text-amber-400">{sizes[selectedSize]}</span>
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {sizes.map((size: string, idx: number) => (
-                        <button
-                          key={size}
-                          onClick={() => setSelectedSize(idx)}
-                          className={cn(
-                            "min-w-12 h-10 px-3 border text-sm font-medium transition-all",
-                            selectedSize === idx 
-                              ? "bg-amber-400 text-black border-amber-400" 
-                              : "bg-transparent text-white border-white/30 hover:border-white"
-                          )}
-                        >
-                          {size}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
+                  {/* Condition Badge */}
+                  {product.condition && (
+                    <span className={cn(
+                      "inline-block text-xs font-bold px-3 py-1 tracking-wider mb-4",
+                      product.condition === 'NEW' ? "bg-amber-400 text-black" :
+                      product.condition === 'THRIFTED' ? "bg-purple-500 text-white" :
+                      "bg-blue-500 text-white"
+                    )}>
+                      {product.condition as string}
+                    </span>
+                  )}
 
-                {/* Quantity */}
-                <div className="mb-6">
-                  <label className="block text-white text-sm font-medium mb-3">Quantity</label>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center border border-white/30">
-                      <button
-                        onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                        className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="w-12 text-center text-white font-medium">{quantity}</span>
-                      <button
-                        onClick={() => setQuantity(quantity + 1)}
-                        className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex gap-3">
-                  <Button
-                    onClick={handleAddToCart}
-                    className="flex-1 bg-amber-400 hover:!bg-amber-300 text-black font-bold py-4 text-lg rounded-none transition-colors"
-                  >
-                    ADD TO CART — {formatPrice((product.price as number) * quantity)}
-                  </Button>
-                  <button 
-                    onClick={() => setIsLiked(!isLiked)}
-                    className={cn(
-                      "w-12 h-12 flex items-center justify-center border transition-colors",
-                      isLiked 
-                        ? "bg-red-500 border-red-500 text-white" 
-                        : "border-white/30 text-white hover:border-amber-400 hover:text-amber-400"
+                  {/* Price */}
+                  <div className="flex items-center gap-3 mb-6">
+                    <span className="text-2xl font-bold text-white">{formatPrice(product.price as number)}</span>
+                    {product.compareAt && (
+                      <span className="text-lg text-white/40 line-through">{formatPrice(product.compareAt as number)}</span>
                     )}
-                  >
-                    <Heart className={cn("w-5 h-5", isLiked && "fill-current")} />
-                  </button>
-                  <button className="w-12 h-12 border border-white/30 text-white hover:border-amber-400 hover:text-amber-400 flex items-center justify-center transition-colors">
-                    <Share2 className="w-5 h-5" />
-                  </button>
-                </div>
+                  </div>
 
-                {/* Limited Badge */}
-                {product.isLimited && (
-                  <p className="text-center text-red-400 text-sm mt-4">
-                    🔥 Only {product.limitedQty as number} left — Limited Edition
+                  {/* Description */}
+                  <p className="text-white/60 text-sm leading-relaxed mb-6">
+                    {product.description as string}
                   </p>
-                )}
+
+                  {/* Color */}
+                  {colors.length > 0 && (
+                    <div className="mb-4">
+                      <label className="block text-white text-sm font-medium mb-3">
+                        Color: <span className="text-amber-400">{colors[selectedColor]}</span>
+                      </label>
+                      <div className="flex gap-2">
+                        {colors.map((color: string, idx: number) => (
+                          <button
+                            key={color}
+                            onClick={() => setSelectedColor(idx)}
+                            className={cn(
+                              "w-8 h-8 rounded-full transition-all duration-200 flex items-center justify-center",
+                              selectedColor === idx 
+                                ? "ring-2 ring-amber-400 ring-offset-2 ring-offset-black" 
+                                : "hover:scale-110"
+                            )}
+                            style={{
+                              backgroundColor: getColorHex(color),
+                              border: isLightColor(color) ? '1px solid rgba(255,255,255,0.2)' : 'none',
+                            }}
+                            title={color}
+                          >
+                            {selectedColor === idx && (
+                              <div className={cn(
+                                "w-2 h-2 rounded-full",
+                                isLightColor(color) ? "bg-black" : "bg-white"
+                              )} />
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Size */}
+                  {sizes.length > 0 && (
+                    <div className="mb-6">
+                      <label className="block text-white text-sm font-medium mb-3">
+                        Size: <span className="text-amber-400">{sizes[selectedSize]}</span>
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {sizes.map((size: string, idx: number) => (
+                          <button
+                            key={size}
+                            onClick={() => setSelectedSize(idx)}
+                            className={cn(
+                              "min-w-12 h-10 px-3 border text-sm font-medium transition-all",
+                              selectedSize === idx 
+                                ? "bg-amber-400 text-black border-amber-400" 
+                                : "bg-transparent text-white border-white/30 hover:border-white"
+                            )}
+                          >
+                            {size}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Quantity */}
+                  <div className="mb-6">
+                    <label className="block text-white text-sm font-medium mb-3">Quantity</label>
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center border border-white/30">
+                        <button
+                          onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                          className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="w-12 text-center text-white font-medium">{quantity}</span>
+                        <button
+                          onClick={() => setQuantity(quantity + 1)}
+                          className="w-10 h-10 flex items-center justify-center text-white hover:bg-white/10 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleAddToCart}
+                      className="flex-1 bg-amber-400 hover:!bg-amber-300 text-black font-bold py-4 text-lg rounded-none transition-colors"
+                    >
+                      ADD TO CART — {formatPrice((product.price as number) * quantity)}
+                    </Button>
+                    <button 
+                      onClick={handleToggleWishlist}
+                      className={cn(
+                        "w-12 h-12 flex items-center justify-center border transition-colors",
+                        isLiked 
+                          ? "bg-red-500 border-red-500 text-white" 
+                          : "border-white/30 text-white hover:border-amber-400 hover:text-amber-400"
+                      )}
+                    >
+                      <Heart className={cn("w-5 h-5", isLiked && "fill-current")} />
+                    </button>
+                    <button className="w-12 h-12 border border-white/30 text-white hover:border-amber-400 hover:text-amber-400 flex items-center justify-center transition-colors">
+                      <Share2 className="w-5 h-5" />
+                    </button>
+                  </div>
+
+                  {/* Limited Badge */}
+                  {product.isLimited && (
+                    <p className="text-center text-red-400 text-sm mt-4">
+                      🔥 Only {product.limitedQty as number} left — Limited Edition
+                    </p>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
           </motion.div>
         </motion.div>
       )}

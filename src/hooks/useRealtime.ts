@@ -90,10 +90,9 @@ export const useSettingsStore = create<SettingsStore>()(
     {
       name: 'clothing-ctrl-settings',
       partialize: (state) => ({
-        settings: state.settings,
-        socials: state.socials,
-        lastUpdated: state.lastUpdated,
-        // NOTE: dismissedBannerText is NOT persisted - it resets on page refresh
+        // Only persist dismissedBannerText, not the settings themselves
+        // This ensures fresh settings are always fetched from the server
+        dismissedBannerText: state.dismissedBannerText,
       }),
     }
   )
@@ -328,10 +327,20 @@ export function useRealtime() {
       fetchSocials();
     };
     
+    // Also re-fetch when page becomes visible (for same-tab navigation)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchSettings();
+        fetchSocials();
+      }
+    };
+    
     window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
     
     return () => {
       window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
       settingsChannel?.removeEventListener('message', handleMessage);
       // Don't disconnect SSE - keep it alive for other components
     };

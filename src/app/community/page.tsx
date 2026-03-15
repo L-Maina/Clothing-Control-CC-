@@ -9,9 +9,6 @@ import {
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Newsletter } from '@/components/sections/Newsletter';
 import { useAuthStore } from '@/lib/store';
 import {
@@ -231,11 +228,8 @@ export default function CommunityPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <Navbar />
-      <CartDrawer />
-      
-      <main className="flex-1 pt-24 pb-12">
+    <>
+      <main className="pt-24 pb-12">
         <div className="container mx-auto px-4 lg:px-8">
           {/* Header */}
           <div className="mb-12">
@@ -513,8 +507,6 @@ export default function CommunityPage() {
         </div>
       </main>
 
-      <Footer />
-
       {/* Review Modal */}
       <Dialog open={isReviewModalOpen} onOpenChange={setIsReviewModalOpen}>
         <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-lg max-h-[90vh] overflow-y-auto">
@@ -638,7 +630,7 @@ export default function CommunityPage() {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 

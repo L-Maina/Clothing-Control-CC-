@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X, ShoppingBag, Search, User, Globe, Heart, LogOut, Package, Instagram, Twitter, Facebook, Youtube, Sparkles, Crown, Award, Settings } from 'lucide-react';
 import { useCartStore, useCurrencyStore, useAuthStore, useWishlistStore, CURRENCIES, CurrencyCode } from '@/lib/store';
-import { useSettingsStore } from '@/hooks/useRealtime';
+import { useSettingsStore, useRealtime } from '@/hooks/useRealtime';
 import { cn } from '@/lib/utils';
 
 // Lazy load SearchModal - only load when needed
@@ -60,6 +60,9 @@ export function Navbar() {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [socialLinks, setSocialLinks] = useState<SocialHandle[]>([]);
   const mounted = useMounted();
+  
+  // Initialize real-time sync for settings
+  useRealtime();
   
   // Get banner settings and dismissed text from shared store
   const settings = useSettingsStore((state) => state.settings);
@@ -201,10 +204,10 @@ export function Navbar() {
                 className="relative"
               >
                 <span className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tighter text-white group-hover:text-amber-400 transition-colors duration-300">
-                  CLOTHING
+                  {settings.storeName?.replace('Ctrl', '').trim().toUpperCase() || 'CLOTHING'}
                 </span>
                 <span className="text-xl sm:text-2xl lg:text-3xl font-black tracking-tighter text-amber-400 ml-1">
-                  CTRL
+                  {settings.storeName?.includes('Ctrl') ? 'CTRL' : ''}
                 </span>
               </motion.div>
             </Link>
@@ -433,7 +436,7 @@ export function Navbar() {
             >
               <div className="flex items-center justify-between p-4 border-b border-white/10">
                 <span className="text-xl font-bold text-white">
-                  CLOTHING<span className="text-amber-400">CTRL</span>
+                  {settings.storeName?.replace('Ctrl', '').trim().toUpperCase() || 'CLOTHING'}<span className="text-amber-400">{settings.storeName?.includes('Ctrl') ? 'CTRL' : ''}</span>
                 </span>
                 <button
                   onClick={() => setIsMobileMenuOpen(false)}

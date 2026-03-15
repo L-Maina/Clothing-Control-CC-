@@ -238,7 +238,7 @@ export function ShopSection() {
             <Button
               onClick={() => setVisibleCount(prev => prev + 8)}
               variant="outline"
-              className="border-white/20 text-white hover:bg-white hover:text-black px-8 py-6 rounded-none"
+              className="!border-white !bg-transparent text-white hover:!bg-white hover:!text-black px-8 py-6 rounded-none transition-colors"
             >
               LOAD MORE PRODUCTS
             </Button>

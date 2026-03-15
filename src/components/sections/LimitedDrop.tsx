@@ -15,32 +15,45 @@ interface DropData {
 }
 
 // Countdown Timer Component
-function CountdownTimer({ targetDate }: { targetDate: Date }) {
+function CountdownTimer({ targetDate, onExpired }: { targetDate: Date; onExpired: () => void }) {
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
     minutes: 0,
     seconds: 0,
   });
+  const [expired, setExpired] = useState(false);
 
   useEffect(() => {
     const calculateTimeLeft = () => {
       const difference = targetDate.getTime() - new Date().getTime();
       
-      if (difference > 0) {
-        setTimeLeft({
-          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
-          minutes: Math.floor((difference / 1000 / 60) % 60),
-          seconds: Math.floor((difference / 1000) % 60),
-        });
+      if (difference <= 0) {
+        setExpired(true);
+        onExpired();
+        return;
       }
+      
+      setTimeLeft({
+        days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+        hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+        minutes: Math.floor((difference / 1000 / 60) % 60),
+        seconds: Math.floor((difference / 1000) % 60),
+      });
     };
 
     calculateTimeLeft();
     const timer = setInterval(calculateTimeLeft, 1000);
     return () => clearInterval(timer);
-  }, [targetDate]);
+  }, [targetDate, onExpired]);
+
+  if (expired) {
+    return (
+      <div className="text-red-400 font-bold text-lg">
+        Drop has ended
+      </div>
+    );
+  }
 
   const timeBlocks = [
     { label: 'DAYS', value: timeLeft.days },
@@ -70,17 +83,26 @@ function CountdownTimer({ targetDate }: { targetDate: Date }) {
 export function LimitedDrop() {
   const [drop, setDrop] = useState<DropData | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isExpired, setIsExpired] = useState(false);
 
   useEffect(() => {
     fetch('/api/drop')
       .then(res => res.json())
       .then(data => {
+        if (data && data.date) {
+          // Check if drop has already expired
+          const dropDate = new Date(data.date);
+          if (dropDate.getTime() <= new Date().getTime()) {
+            setIsExpired(true);
+          }
+        }
         setDrop(data);
         setLoading(false);
       })
       .catch(() => setLoading(false));
   }, []);
 
+  // Don't render if loading, no drop, or expired
   if (loading) {
     return (
       <section id="drop" className="py-20 lg:py-32 bg-black">
@@ -91,7 +113,7 @@ export function LimitedDrop() {
     );
   }
 
-  if (!drop) return null;
+  if (!drop || isExpired) return null;
 
   return (
     <section id="drop" className="py-20 lg:py-32 bg-zinc-950 relative overflow-hidden">
@@ -135,7 +157,10 @@ export function LimitedDrop() {
                 <Clock className="w-4 h-4" />
                 Drops in
               </div>
-              <CountdownTimer targetDate={new Date(drop.date)} />
+              <CountdownTimer 
+                targetDate={new Date(drop.date)} 
+                onExpired={() => setIsExpired(true)}
+              />
             </div>
 
             {/* CTA */}

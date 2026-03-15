@@ -94,11 +94,16 @@ export default function AdminSettings() {
         body: JSON.stringify(settings),
       });
       
-      if (response.ok) {
-        const data = await response.json();
-        setSettings({ ...defaultSettings, ...data.settings });
-        
-        // Broadcast the update to all open tabs (customer site, etc.)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `Failed to save settings (${response.status})`);
+      }
+      
+      const data = await response.json();
+      setSettings({ ...defaultSettings, ...data.settings });
+      
+      // Broadcast the update to all open tabs (customer site, etc.)
+      try {
         broadcastSettingsUpdate({
           storeName: data.settings.storeName,
           storeDescription: data.settings.storeDescription,
@@ -115,12 +120,15 @@ export default function AdminSettings() {
           bannerText: data.settings.bannerText,
           bannerLink: data.settings.bannerLink,
         });
-        
-        setSaved(true);
-        setTimeout(() => setSaved(false), 3000);
+      } catch {
+        // BroadcastChannel might not be supported, ignore
       }
+      
+      setSaved(true);
+      setTimeout(() => setSaved(false), 3000);
     } catch (error) {
       console.error('Failed to save settings:', error);
+      alert(error instanceof Error ? error.message : 'Failed to save settings. Please try again.');
     } finally {
       setSaving(false);
     }

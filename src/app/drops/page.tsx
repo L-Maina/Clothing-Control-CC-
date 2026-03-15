@@ -6,9 +6,6 @@ import { ArrowLeft, Clock, Bell, Calendar, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import { ProductCard } from '@/components/products/ProductCard';
 import { Button } from '@/components/ui/button';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { CartDrawer } from '@/components/cart/CartDrawer';
 import { Newsletter } from '@/components/sections/Newsletter';
 
 interface Drop {
@@ -96,11 +93,7 @@ export default function DropsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <Navbar />
-      <CartDrawer />
-      
-      <main className="flex-1 pt-24 pb-12">
+    <main className="pt-24 pb-12">
         <div className="container mx-auto px-4 lg:px-8">
           {/* Header */}
           <div className="mb-12">
@@ -224,8 +217,5 @@ export default function DropsPage() {
           </section>
         </div>
       </main>
-
-      <Footer />
-    </div>
   );
 }

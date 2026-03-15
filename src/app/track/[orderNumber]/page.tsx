@@ -11,9 +11,6 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Navbar } from '@/components/layout/Navbar';
-import { Footer } from '@/components/layout/Footer';
-import { CartDrawer } from '@/components/cart/CartDrawer';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 
@@ -115,11 +112,7 @@ export default function TrackOrderPage({ params }: { params: Promise<{ orderNumb
   };
 
   return (
-    <div className="min-h-screen bg-black flex flex-col">
-      <Navbar />
-      <CartDrawer />
-      
-      <main className="flex-1 pt-24 pb-12">
+    <main className="pt-24 pb-12">
         <div className="container mx-auto px-4 lg:px-8 max-w-3xl">
           {/* Header */}
           <div className="mb-8">
@@ -432,8 +425,5 @@ export default function TrackOrderPage({ params }: { params: Promise<{ orderNumb
           )}
         </div>
       </main>
-
-      <Footer />
-    </div>
   );
 }
