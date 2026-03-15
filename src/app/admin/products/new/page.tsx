@@ -19,7 +19,6 @@ import {
 import {
   ArrowLeft,
   Save,
-  Upload,
   X,
   Plus,
   Image as ImageIcon,
@@ -51,6 +50,7 @@ export default function NewProductPage() {
     tags: '',
   });
   const [images, setImages] = useState<string[]>([]);
+  const [imageUrl, setImageUrl] = useState('');
   const [colors, setColors] = useState<string[]>(['']);
   const [sizes, setSizes] = useState<string[]>(['']);
 
@@ -97,9 +97,17 @@ export default function NewProductPage() {
     }
   };
 
-  const addImage = (url: string) => {
-    if (url && !images.includes(url)) {
-      setImages([...images, url]);
+  const addImage = () => {
+    if (imageUrl.trim() && !images.includes(imageUrl.trim())) {
+      setImages([...images, imageUrl.trim()]);
+      setImageUrl('');
+    }
+  };
+
+  const handleImageKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      addImage();
     }
   };
 
@@ -190,7 +198,29 @@ export default function NewProductPage() {
               <CardContent className="p-6">
                 <h3 className="text-lg font-semibold text-white mb-4">Product Images</h3>
                 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                {/* Image Input */}
+                <div className="flex gap-2 mb-4">
+                  <Input
+                    type="url"
+                    value={imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    onKeyPress={handleImageKeyPress}
+                    placeholder="Paste image URL and press Enter or click Add"
+                    className="flex-1 bg-zinc-800 border-white/10 text-white placeholder:text-white/40 focus:border-amber-400"
+                  />
+                  <Button
+                    type="button"
+                    onClick={addImage}
+                    disabled={!imageUrl.trim()}
+                    className="bg-amber-400 hover:bg-amber-300 text-black font-bold shrink-0"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
+                  </Button>
+                </div>
+
+                {/* Image Grid */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   {images.map((img, index) => (
                     <div key={index} className="relative aspect-square rounded-lg overflow-hidden bg-zinc-800">
                       <img src={img} alt="" className="w-full h-full object-cover" />
@@ -203,29 +233,13 @@ export default function NewProductPage() {
                       </button>
                     </div>
                   ))}
-                  <label className="aspect-square rounded-lg border-2 border-dashed border-white/20 flex flex-col items-center justify-center cursor-pointer hover:border-amber-400/50 transition-colors">
-                    <Upload className="w-6 h-6 text-white/40 mb-2" />
-                    <span className="text-white/40 text-sm">Add Image</span>
-                    <input
-                      type="text"
-                      placeholder="Paste image URL"
-                      className="hidden"
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          addImage(e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                      onBlur={(e) => {
-                        if (e.target.value) {
-                          addImage(e.target.value);
-                          e.target.value = '';
-                        }
-                      }}
-                    />
-                  </label>
+                  {images.length === 0 && (
+                    <div className="aspect-square rounded-lg border-2 border-dashed border-white/20 flex flex-col items-center justify-center col-span-2 md:col-span-4">
+                      <ImageIcon className="w-8 h-8 text-white/20 mb-2" />
+                      <span className="text-white/40 text-sm">No images added yet</span>
+                    </div>
+                  )}
                 </div>
-                <p className="text-white/40 text-sm">Paste image URLs to add product images</p>
               </CardContent>
             </Card>
 
